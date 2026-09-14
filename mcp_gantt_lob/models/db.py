@@ -30,7 +30,11 @@ def _connect():
         raise RuntimeError(
             "TURSO_DATABASE_URL não configurada — defina a env var no serviço."
         )
-    return libsql_client.create_client_sync(url=DB_PATH, auth_token=TURSO_AUTH_TOKEN)
+    # O client sync sobre libsql:// tenta WebSocket, que falhou no handshake
+    # em produção (WSServerHandshakeError 400). https:// usa o transporte
+    # HTTP remoto, mais compatível com o client síncrono.
+    url = DB_PATH.replace("libsql://", "https://", 1)
+    return libsql_client.create_client_sync(url=url, auth_token=TURSO_AUTH_TOKEN)
 
 
 def init_db() -> None:
