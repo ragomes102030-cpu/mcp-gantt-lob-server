@@ -34,6 +34,8 @@ mcp = FastMCP(
         "CPM, progresso realizado) tipicamente vindas do mcp-cronograma-server "
         "e chame gerar_gantt para obter o arquivo pronto em base64."
     ),
+    mask_error_details=True,  # auditoria: sem auth neste MCP, evita vazar
+    # stack trace/paths internos pra quem mandar payload malformado de propósito.
 )
 
 
