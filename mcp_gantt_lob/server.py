@@ -15,9 +15,12 @@ import os
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.server import TransportSecuritySettings
 
+from .models import db
 from .models.gantt import atividade_from_dict, gerar_gantt_base64
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "mcp-gantt-lob-server.onrender.com").split(",")
+
+db.init_db()  # nunca levanta exceção — ver models/db.py
 
 mcp = FastMCP(
     name="mcp-gantt-lob-server",
@@ -66,10 +69,18 @@ def gerar_gantt(
     atividades_obj = [atividade_from_dict(a) for a in atividades]
     xlsx_b64 = gerar_gantt_base64(project_name, atividades_obj, tema=tema, cor_marca=cor_marca)
 
+    db.registrar_export(project_name, tema, cor_marca, len(atividades_obj))
+
     return {
         "filename": f"{project_name.replace(' ', '_')}_gantt.xlsx",
         "xlsx_base64": xlsx_b64,
     }
+
+
+@mcp.tool()
+def listar_exports(limit: int = 50) -> list[dict]:
+    """Lista o histórico de exports de Gantt já gerados (auditoria)."""
+    return db.listar_exports(limit=limit)
 
 
 @mcp.tool()
