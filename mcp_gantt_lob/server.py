@@ -3,17 +3,20 @@ mcp_gantt_lob/server.py
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Servidor FastMCP do mcp-gantt-lob-server.
 
-Segue o padrão de segurança já validado no mcp-cronograma-server:
-TransportSecuritySettings com allowed_hosts explícito, mantendo
-enable_dns_rebinding_protection=True (NÃO desativar a proteção inteira,
-diferente do que foi feito por engano no mcp-eap-server).
+Segue o padrão de segurança já validado no mcp-cronograma-server (allowed
+hosts explícito, proteção de DNS rebinding mantida ativa), mas usando a
+API atual do pacote `fastmcp` standalone (v4.x) — o pacote `mcp` (SDK
+oficial, v2.x no ambiente do Render) renomeou FastMCP para MCPServer e
+mudou a estrutura interna, então o import correto é `from fastmcp import
+FastMCP`, NÃO `from mcp.server.fastmcp import FastMCP`. Nessa versão,
+`allowed_hosts` vai direto no `.run()`, não mais num objeto
+TransportSecuritySettings passado ao construtor.
 """
 from __future__ import annotations
 
 import os
 
-from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp.server import TransportSecuritySettings
+from fastmcp import FastMCP
 
 from .models import db
 from .models.gantt import atividade_from_dict, gerar_gantt_base64
@@ -30,10 +33,6 @@ mcp = FastMCP(
         "Este MCP é STATELESS: receba as atividades já calculadas (datas do "
         "CPM, progresso realizado) tipicamente vindas do mcp-cronograma-server "
         "e chame gerar_gantt para obter o arquivo pronto em base64."
-    ),
-    transport_security=TransportSecuritySettings(
-        enable_dns_rebinding_protection=True,
-        allowed_hosts=ALLOWED_HOSTS,
     ),
 )
 
@@ -91,4 +90,9 @@ def listar_temas() -> list[str]:
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
+    mcp.run(
+        transport="streamable-http",
+        host="0.0.0.0",
+        port=port,
+        allowed_hosts=ALLOWED_HOSTS,
+    )
