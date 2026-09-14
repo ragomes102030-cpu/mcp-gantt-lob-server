@@ -110,14 +110,18 @@ def gerar_gantt_xlsx(
     style: GanttStyle = GanttTheme.from_color(cor_marca) if cor_marca else GanttTheme.get(tema)
     cor_planejado = style.bar_color
 
-    # Agrupa atividades por seção, preservando ordem de entrada
+    # Agrupa atividades por seção, preservando ordem de entrada. Mantém
+    # também a lista de AtividadeInput por seção (mesma ordem dos Task),
+    # para o pós-processamento de célula crítica poder achar a linha certa
+    # sem re-percorrer a lista original do zero.
     secoes_ordem: list[str] = []
     secoes_map: dict[str, list[Task]] = {}
-    linhas_por_secao: dict[str, int] = {}
+    secoes_atividades: dict[str, list[AtividadeInput]] = {}
 
     for a in atividades:
         if a.secao not in secoes_map:
             secoes_map[a.secao] = []
+            secoes_atividades[a.secao] = []
             secoes_ordem.append(a.secao)
 
         task = Task(
@@ -126,6 +130,7 @@ def gerar_gantt_xlsx(
             ranges=_status_ranges(a, cor_planejado),
         )
         secoes_map[a.secao].append(task)
+        secoes_atividades[a.secao].append(a)
 
     sections = [Section(name=nome, tasks=secoes_map[nome]) for nome in secoes_ordem]
 
@@ -143,7 +148,8 @@ def gerar_gantt_xlsx(
     )
 
     xlsx_bytes = chart.generate_excel_bytes()
-    return _aplicar_agrupamento(xlsx_bytes, secoes_ordem, secoes_map)
+    xlsx_bytes = _aplicar_agrupamento(xlsx_bytes, secoes_ordem, secoes_map)
+    return _marcar_criticas(xlsx_bytes, secoes_ordem, secoes_atividades)
 
 
 def _aplicar_agrupamento(
@@ -169,6 +175,44 @@ def _aplicar_agrupamento(
             linha_atual += 1
 
     ws.sheet_properties.outlinePr.summaryBelow = False
+
+    buf_out = io.BytesIO()
+    wb.save(buf_out)
+    return buf_out.getvalue()
+
+
+def _marcar_criticas(
+    xlsx_bytes: bytes,
+    secoes_ordem: list[str],
+    secoes_atividades: dict[str, list["AtividadeInput"]],
+) -> bytes:
+    """Pós-processa o .xlsx: nome de atividade crítica (folga zero no CPM)
+    vira negrito + borda vermelha na célula — sem isso, `critico` era
+    recebido pela tool e simplesmente descartado (bug achado em auditoria:
+    a informação mais importante do CPM pro leitor do Gantt não aparecia
+    em lugar nenhum do arquivo gerado)."""
+    import io
+
+    import openpyxl
+    from openpyxl.styles import Border, Font, Side
+
+    buf_in = io.BytesIO(xlsx_bytes)
+    wb = openpyxl.load_workbook(buf_in)
+    ws = wb.active
+
+    borda_vermelha = Border(
+        left=Side(style="thin", color="C00000"), right=Side(style="thin", color="C00000"),
+        top=Side(style="thin", color="C00000"), bottom=Side(style="thin", color="C00000"),
+    )
+
+    linha_atual = 4  # mesmo offset de cabeçalho usado em _aplicar_agrupamento
+    for secao in secoes_ordem:
+        for atividade in secoes_atividades[secao]:
+            if atividade.critico:
+                celula = ws.cell(row=linha_atual, column=2)  # coluna "Task" (nome da atividade)
+                celula.font = Font(bold=True, color="C00000")
+                celula.border = borda_vermelha
+            linha_atual += 1
 
     buf_out = io.BytesIO()
     wb.save(buf_out)

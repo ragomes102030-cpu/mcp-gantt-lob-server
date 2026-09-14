@@ -15,6 +15,7 @@ TransportSecuritySettings passado ao construtor.
 from __future__ import annotations
 
 import os
+from typing import Any, Callable
 
 from fastmcp import FastMCP
 
@@ -37,6 +38,18 @@ mcp = FastMCP(
     mask_error_details=True,  # auditoria: sem auth neste MCP, evita vazar
     # stack trace/paths internos pra quem mandar payload malformado de propósito.
 )
+
+
+def _seguro(fn: Callable[[], Any]) -> Any:
+    """Converte qualquer exceção em ``{"erro": "..."}`` em vez de deixar
+    propagar como erro de protocolo MCP — mesmo contrato de resposta usado
+    no mcp-eap-server e no mcp-cronograma-server, pra um agente que orquestra
+    os três MCPs não precisar tratar formatos de erro diferentes por serviço.
+    """
+    try:
+        return fn()
+    except Exception as exc:
+        return {"erro": str(exc)}
 
 
 @mcp.tool()
@@ -65,23 +78,29 @@ def gerar_gantt(
     cor da marca/empresa.
 
     Retorna dict com `filename` e `xlsx_base64` (decodificar e salvar como
-    .xlsx no cliente).
+    .xlsx no cliente), ou `{"erro": "..."}` em caso de falha (ex.: lista
+    vazia, data em formato errado, atividade sem campo obrigatório).
     """
-    atividades_obj = [atividade_from_dict(a) for a in atividades]
-    xlsx_b64 = gerar_gantt_base64(project_name, atividades_obj, tema=tema, cor_marca=cor_marca)
+    def _executar() -> dict:
+        atividades_obj = [atividade_from_dict(a) for a in atividades]
+        xlsx_b64 = gerar_gantt_base64(project_name, atividades_obj, tema=tema, cor_marca=cor_marca)
+        db.registrar_export(project_name, tema, cor_marca, len(atividades_obj))
+        return {
+            "filename": f"{project_name.replace(' ', '_')}_gantt.xlsx",
+            "xlsx_base64": xlsx_b64,
+        }
 
-    db.registrar_export(project_name, tema, cor_marca, len(atividades_obj))
-
-    return {
-        "filename": f"{project_name.replace(' ', '_')}_gantt.xlsx",
-        "xlsx_base64": xlsx_b64,
-    }
+    return _seguro(_executar)
 
 
 @mcp.tool()
-def listar_exports(limit: int = 50) -> list[dict]:
-    """Lista o histórico de exports de Gantt já gerados (auditoria)."""
-    return db.listar_exports(limit=limit)
+def listar_exports(limit: int = 50) -> list[dict] | dict:
+    """Lista o histórico de exports de Gantt já gerados (auditoria).
+
+    Retorna `{"erro": "..."}` se o log Turso não estiver configurado ou
+    inacessível — nunca derruba a chamada.
+    """
+    return _seguro(lambda: db.listar_exports(limit=limit))
 
 
 @mcp.tool()

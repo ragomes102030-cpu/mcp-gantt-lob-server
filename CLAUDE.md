@@ -14,11 +14,18 @@
   ainda não uso COR_EM_RISCO de verdade na lógica (`_status_ranges`
   só decide concluída/planejada/atrasada); falta regra de "em risco"
   (perto do prazo, progresso abaixo do esperado mas ainda não venceu).
-- Pendente (v1.1, documentado no README): Linha de Balanço; caminho
-  crítico destacado (usar `critico` do AtividadeInput, hoje só é
-  recebido e ignorado); linha do "hoje" no calendário; coluna de
-  recursos/equipe via `resource_names`/`annotations` da lib; legenda
-  automática de cores.
+- Pendente (v1.1, documentado no README): Linha de Balanço; linha do
+  "hoje" no calendário; coluna de recursos/equipe via
+  `resource_names`/`annotations` da lib; legenda automática de cores;
+  regra de "em risco" (COR_EM_RISCO declarada mas não usada em
+  `_status_ranges` — falta a lógica de "perto do prazo, progresso
+  abaixo do esperado, mas ainda não venceu").
+- RESOLVIDO (auditoria): caminho crítico agora É destacado — atividade
+  com `critico=True` fica em negrito + borda vermelha na coluna "Task"
+  (`_marcar_criticas` em `models/gantt.py`). Attention: a coluna do
+  nome da tarefa é a 2 ("Task"), não a 1 ("Activity" = nome da seção,
+  só preenchido na primeira linha do grupo) — confundir as duas foi o
+  primeiro erro da correção, testado e corrigido antes de commitar.
 - Ainda não testado: `gerar_gantt_base64` dentro de uma chamada real
   de tool MCP via protocolo (só testei a função Python direto). Rodar
   `mcp.run()` local e testar com um cliente MCP antes do deploy.

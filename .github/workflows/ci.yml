@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Sintaxe (py_compile)
+        run: python -m py_compile mcp_gantt_lob/*.py mcp_gantt_lob/models/*.py
+      - name: Testes
+        run: python -m pytest tests/ -q --cov=mcp_gantt_lob --cov-report=term-missing --cov-fail-under=70
