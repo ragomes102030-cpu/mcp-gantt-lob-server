@@ -21,6 +21,7 @@ from fastmcp import FastMCP
 
 from .models import db
 from .models.gantt import atividade_from_dict, gerar_gantt_base64
+from .models.lob import AtividadeLOB, balancear_ritmos, calcular_linha_balanco as calcular_lob, dimensionar_equipes
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "mcp-gantt-lob-server.onrender.com").split(",")
 
@@ -29,11 +30,17 @@ db.init_db()  # nunca levanta exceção — ver models/db.py
 mcp = FastMCP(
     name="mcp-gantt-lob-server",
     instructions=(
-        "Especialista em geração de Gantt profissional (.xlsx) e, futuramente, "
-        "Linha de Balanço, seguindo a metodologia de Aldo Dórea Mattos. "
-        "Este MCP é STATELESS: receba as atividades já calculadas (datas do "
-        "CPM, progresso realizado) tipicamente vindas do mcp-cronograma-server "
-        "e chame gerar_gantt para obter o arquivo pronto em base64."
+        "Especialista em geração de Gantt profissional (.xlsx) e em Linha de "
+        "Balanço (LOB), seguindo a metodologia de Aldo Dórea Mattos. Este MCP "
+        "é STATELESS: receba os dados já calculados no payload de cada chamada "
+        "(datas do CPM, progresso realizado — tipicamente do mcp-cronograma-server). "
+        "Para Gantt: chame gerar_gantt. Para obras com unidades repetitivas "
+        "(andares, casas, trechos de rodovia): use calcular_linha_balanco em vez "
+        "de tratar cada unidade como atividade separada no cronograma — ela já "
+        "calcula início/fim por unidade e sinaliza risco_interferencia (equipe "
+        "mais rápida esperando a de trás). Se aparecer risco_interferencia=True, "
+        "chame balancear_ritmos para ver como corrigir (mudar nº de equipes de "
+        "qual atividade) antes de gerar o Gantt final."
     ),
     mask_error_details=True,  # auditoria: sem auth neste MCP, evita vazar
     # stack trace/paths internos pra quem mandar payload malformado de propósito.
@@ -107,6 +114,97 @@ def listar_exports(limit: int = 50) -> list[dict] | dict:
 def listar_temas() -> list[str]:
     """Lista os temas de cor prontos disponíveis para gerar_gantt."""
     return ["ocean", "slate", "forest", "amber", "crimson", "midnight", "royal_purple", "teal"]
+
+
+def _atividades_lob_from_dicts(atividades: list[dict]) -> list[AtividadeLOB]:
+    return [
+        AtividadeLOB(
+            nome=a["nome"],
+            tempo_unitario=float(a["tempo_unitario"]),
+            numero_equipes=int(a.get("numero_equipes", 1)),
+            pulmao_dias=float(a.get("pulmao_dias", 0)),
+        )
+        for a in atividades
+    ]
+
+
+@mcp.tool()
+def calcular_linha_balanco(
+    atividades: list[dict],
+    unidades: list[str],
+    data_inicio: str | None = None,
+) -> dict:
+    """
+    Calcula a Linha de Balanço (Cap. 20 do Mattos): início/fim de cada
+    atividade em cada unidade de repetição (andar, casa, trecho...).
+
+    `atividades` na ORDEM de execução (a [i] é predecessora da [i+1] na
+    mesma unidade). Cada item:
+        - nome (str)
+        - tempo_unitario (float) — dias para 1 equipe fazer 1 unidade
+        - numero_equipes (int, opcional, default 1) — reduz o tempo de
+          ritmo (tr = tempo_unitario / numero_equipes)
+        - pulmao_dias (float, opcional, default 0) — espera mínima extra
+          além da predecessora, na mesma unidade
+
+    `unidades`: lista ordenada de unidades de repetição, ex.:
+        ["Casa 1", "Casa 2", "Casa 3"] ou ["Pav. 1", ..., "Pav. 10"].
+
+    `data_inicio` (str "YYYY-MM-DD", opcional): se informado, cada
+    unidade também vem com data_inicio/data_fim reais (dias corridos —
+    não considera calendário de dias úteis nesta v1).
+
+    Retorna, por atividade: ritmo (dias/unidade), espera_total_dias e
+    `risco_interferencia` (True = a equipe ficou parada esperando a
+    predecessora em algum ponto — ritmo mais rápido que ela, vale
+    balancear). Ou `{"erro": "..."}` em caso de falha (ex.: lista vazia,
+    unidade duplicada, tempo_unitario <= 0).
+    """
+    from datetime import date as _date
+
+    def _executar() -> dict:
+        atividades_obj = _atividades_lob_from_dicts(atividades)
+        data_inicio_obj = _date.fromisoformat(data_inicio) if data_inicio else None
+        return calcular_lob(atividades_obj, unidades, data_inicio=data_inicio_obj)
+
+    return _seguro(_executar)
+
+
+@mcp.tool()
+def balancear_ritmos_lob(atividades: list[dict]) -> dict:
+    """
+    Cap. 20.4 do Mattos (Balanceamento das operações): compara o ritmo de
+    cada atividade com o da atividade imediatamente anterior e sugere
+    como igualar — mudando o nº de equipes da atividade que está causando
+    risco de interferência (equipe parada esperando).
+
+    `atividades`: mesmo formato de `calcular_linha_balanco`, na mesma
+    ORDEM de execução.
+
+    Quando há risco (sucessora mais rápida que a predecessora), retorna
+    as duas formas de corrigir: reduzir a equipe da sucessora (se der pra
+    chegar a >= 1 equipe) ou aumentar a equipe da predecessora pra
+    acelerá-la. Quando não há risco (sucessora igual ou mais lenta —
+    configuração seguro segundo o método), não sugere mudança nenhuma.
+    """
+    def _executar() -> dict:
+        atividades_obj = _atividades_lob_from_dicts(atividades)
+        return balancear_ritmos(atividades_obj)
+
+    return _seguro(_executar)
+
+
+@mcp.tool()
+def dimensionar_equipes_lob(tempo_unitario: float, ritmo_desejado: float) -> dict:
+    """
+    Cap. 20.5 do Mattos (Dimensionamento): quantas equipes uma atividade
+    precisa pra atingir um ritmo desejado (dias por unidade), dado quanto
+    tempo 1 equipe leva pra fazer 1 unidade sozinha.
+
+    Ex.: se 1 equipe leva 6 dias por casa e você quer entregar 1 casa a
+    cada 2 dias (ritmo_desejado=2), retorna 3 equipes.
+    """
+    return _seguro(lambda: {"numero_equipes": dimensionar_equipes(tempo_unitario, ritmo_desejado)})
 
 
 if __name__ == "__main__":

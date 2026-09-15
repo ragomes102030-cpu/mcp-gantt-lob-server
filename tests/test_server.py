@@ -3,8 +3,6 @@ caminho Turso de verdade (mesma ressalva dos outros MCPs — sem
 credenciais reais, só o caminho de degradação graciosa é testável aqui)."""
 from __future__ import annotations
 
-import os
-
 import pytest
 
 
@@ -55,3 +53,73 @@ def test_listar_temas():
     temas = server.listar_temas()
     assert "ocean" in temas
     assert len(temas) == 8
+
+
+# ── Linha de Balanço ──────────────────────────────────────────────────
+
+def test_calcular_linha_balanco_sucesso():
+    from mcp_gantt_lob import server
+    r = server.calcular_linha_balanco(
+        atividades=[
+            {"nome": "Fundação", "tempo_unitario": 3},
+            {"nome": "Alvenaria", "tempo_unitario": 5},
+        ],
+        unidades=["Casa 1", "Casa 2"],
+    )
+    assert "erro" not in r
+    assert r["duracao_total_dias"] == 13.0
+
+
+def test_calcular_linha_balanco_com_data_inicio():
+    from mcp_gantt_lob import server
+    r = server.calcular_linha_balanco(
+        atividades=[{"nome": "A", "tempo_unitario": 5}],
+        unidades=["Casa 1"],
+        data_inicio="2026-03-02",
+    )
+    assert r["atividades"][0]["unidades"][0]["data_inicio"] == "2026-03-02"
+
+
+def test_calcular_linha_balanco_erro_vira_dict():
+    from mcp_gantt_lob import server
+    r = server.calcular_linha_balanco(atividades=[], unidades=["Casa 1"])
+    assert "erro" in r
+
+
+def test_calcular_linha_balanco_numero_equipes_e_pulmao():
+    from mcp_gantt_lob import server
+    r = server.calcular_linha_balanco(
+        atividades=[
+            {"nome": "A", "tempo_unitario": 12, "numero_equipes": 3},
+            {"nome": "B", "tempo_unitario": 4, "pulmao_dias": 1},
+        ],
+        unidades=["Casa 1"],
+    )
+    assert r["atividades"][0]["ritmo_dias_por_unidade"] == 4.0  # 12/3
+
+
+def test_balancear_ritmos_lob_sucesso():
+    from mcp_gantt_lob import server
+    r = server.balancear_ritmos_lob(atividades=[
+        {"nome": "A", "tempo_unitario": 6},
+        {"nome": "B", "tempo_unitario": 4},
+    ])
+    assert r["sugestoes"][1]["risco_interferencia"] is True
+
+
+def test_balancear_ritmos_lob_erro_vira_dict():
+    from mcp_gantt_lob import server
+    r = server.balancear_ritmos_lob(atividades=[{"nome": "A", "tempo_unitario": -1}])
+    assert "erro" in r
+
+
+def test_dimensionar_equipes_lob_sucesso():
+    from mcp_gantt_lob import server
+    r = server.dimensionar_equipes_lob(tempo_unitario=6, ritmo_desejado=4)
+    assert r["numero_equipes"] == 2
+
+
+def test_dimensionar_equipes_lob_erro_vira_dict():
+    from mcp_gantt_lob import server
+    r = server.dimensionar_equipes_lob(tempo_unitario=0, ritmo_desejado=4)
+    assert "erro" in r
