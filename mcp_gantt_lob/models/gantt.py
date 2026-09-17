@@ -233,7 +233,19 @@ def gerar_gantt_base64(
 
 def atividade_from_dict(d: dict[str, Any]) -> AtividadeInput:
     """Constrói AtividadeInput a partir do dict que a tool MCP recebe
-    (datas como string ISO 'YYYY-MM-DD')."""
+    (datas como string ISO 'YYYY-MM-DD').
+
+    Campos obrigatórios: nome, secao, data_inicio, data_fim_planejada.
+    """
+    CAMPOS_OBRIGATORIOS = ["nome", "secao", "data_inicio", "data_fim_planejada"]
+    for campo in CAMPOS_OBRIGATORIOS:
+        valor = d.get(campo)
+        if valor is None or (isinstance(valor, str) and not valor.strip()):
+            raise ValueError(
+                f"Atividade em 'atividades' está incompleta: falta o campo "
+                f"'{campo}'. Formato esperado: {{nome, secao, data_inicio, "
+                f"data_fim_planejada, progresso, data_fim_prevista_real, critico}}"
+            )
 
     def _parse_data(v: str | None) -> date | None:
         return datetime.strptime(v, "%Y-%m-%d").date() if v else None

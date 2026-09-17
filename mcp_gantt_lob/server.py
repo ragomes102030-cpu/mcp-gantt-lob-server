@@ -48,15 +48,20 @@ mcp = FastMCP(
 
 
 def _seguro(fn: Callable[[], Any]) -> Any:
-    """Converte qualquer exceção em ``{"erro": "..."}`` em vez de deixar
-    propagar como erro de protocolo MCP — mesmo contrato de resposta usado
-    no mcp-eap-server e no mcp-cronograma-server, pra um agente que orquestra
-    os três MCPs não precisar tratar formatos de erro diferentes por serviço.
+    """Converte qualquer exceção em ``{"erro": "..."}``.
+
+    Erros de negócio (ValueError) são propagados para o FastMCP gerar
+    resposta com isError=true; exceções de sistema voltam como ErroOutput.
     """
     try:
-        return fn()
+        resultado = fn()
+        if isinstance(resultado, dict) and "erro" in resultado:
+            raise ValueError(resultado["erro"])
+        return resultado
+    except ValueError:
+        raise
     except Exception as exc:
-        return {"erro": str(exc)}
+        return {"erro": str(exc), "isError": True}
 
 
 @mcp.tool()
@@ -104,10 +109,15 @@ def gerar_gantt(
 def listar_exports(limit: int = 50) -> list[dict] | dict:
     """Lista o histórico de exports de Gantt já gerados (auditoria).
 
-    Retorna `{"erro": "..."}` se o log Turso não estiver configurado ou
-    inacessível — nunca derruba a chamada.
+    Retorna `{"erro": "...", "_status": "log-unavailable"}` se o log Turso
+    não estiver configurado ou inacessível — nunca derruba a chamada.
     """
-    return _seguro(lambda: db.listar_exports(limit=limit))
+    try:
+        resultado = db.listar_exports(limit=limit)
+        return {"result": resultado, "_status": "ok"}
+    except Exception as exc:
+        logger.warning("listar_exports falhou: %s", exc)
+        return {"erro": str(exc), "_status": "log-unavailable"}
 
 
 @mcp.tool()
