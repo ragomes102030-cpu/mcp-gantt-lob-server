@@ -49,3 +49,5 @@ próprio deste serviço, `_connect()` resolvendo `DB_PATH` via
 Padrão dos outros MCPs: Render, `TransportSecuritySettings` com
 `allowed_hosts` explícito e `enable_dns_rebinding_protection=True`
 (nunca desativar a proteção inteira).
+O endpoint `GET /healthz` retorna `{"ok": true}` para probes de disponibilidade;
+o protocolo MCP continua em `POST /mcp`.

@@ -14,15 +14,19 @@ TransportSecuritySettings passado ao construtor.
 """
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Callable
 
 from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from .models import db
 from .models.gantt import atividade_from_dict, gerar_gantt_base64
 from .models.lob import AtividadeLOB, balancear_ritmos, calcular_linha_balanco as calcular_lob, dimensionar_equipes
 
+logger = logging.getLogger(__name__)
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "mcp-gantt-lob-server.onrender.com").split(",")
 
 db.init_db()  # nunca levanta exceção — ver models/db.py
@@ -45,6 +49,11 @@ mcp = FastMCP(
     mask_error_details=True,  # auditoria: sem auth neste MCP, evita vazar
     # stack trace/paths internos pra quem mandar payload malformado de propósito.
 )
+
+
+@mcp.custom_route("/healthz", methods=["GET"])
+async def healthz(_request: Request) -> JSONResponse:
+    return JSONResponse({"ok": True, "service": "mcp-gantt-lob-server"})
 
 
 def _seguro(fn: Callable[[], Any]) -> Any:

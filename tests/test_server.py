@@ -29,17 +29,16 @@ def test_gerar_gantt_sucesso_sem_turso():
     assert len(resultado["xlsx_base64"]) > 0
 
 
-def test_gerar_gantt_erro_vira_dict_com_erro():
+def test_gerar_gantt_erro_de_negocio_e_propagado():
     from mcp_gantt_lob import server
-    resultado = server.gerar_gantt(project_name="X", atividades=[])
-    assert "erro" in resultado
-    assert "vazia" in resultado["erro"]
+    with pytest.raises(ValueError, match="vazia"):
+        server.gerar_gantt(project_name="X", atividades=[])
 
 
-def test_gerar_gantt_atividade_malformada_vira_erro_nao_excecao():
+def test_gerar_gantt_atividade_malformada_propagada():
     from mcp_gantt_lob import server
-    resultado = server.gerar_gantt(project_name="X", atividades=[{"nome": "Sem os outros campos"}])
-    assert "erro" in resultado
+    with pytest.raises(ValueError, match="incompleta"):
+        server.gerar_gantt(project_name="X", atividades=[{"nome": "Sem os outros campos"}])
 
 
 def test_listar_exports_sem_turso_vira_dict_com_erro():
@@ -80,10 +79,10 @@ def test_calcular_linha_balanco_com_data_inicio():
     assert r["atividades"][0]["unidades"][0]["data_inicio"] == "2026-03-02"
 
 
-def test_calcular_linha_balanco_erro_vira_dict():
+def test_calcular_linha_balanco_erro_de_negocio_e_propagado():
     from mcp_gantt_lob import server
-    r = server.calcular_linha_balanco(atividades=[], unidades=["Casa 1"])
-    assert "erro" in r
+    with pytest.raises(ValueError, match="vazia"):
+        server.calcular_linha_balanco(atividades=[], unidades=["Casa 1"])
 
 
 def test_calcular_linha_balanco_numero_equipes_e_pulmao():
@@ -107,10 +106,10 @@ def test_balancear_ritmos_lob_sucesso():
     assert r["sugestoes"][1]["risco_interferencia"] is True
 
 
-def test_balancear_ritmos_lob_erro_vira_dict():
+def test_balancear_ritmos_lob_erro_de_negocio_e_propagado():
     from mcp_gantt_lob import server
-    r = server.balancear_ritmos_lob(atividades=[{"nome": "A", "tempo_unitario": -1}])
-    assert "erro" in r
+    with pytest.raises(ValueError, match="tempo_unitario"):
+        server.balancear_ritmos_lob(atividades=[{"nome": "A", "tempo_unitario": -1}])
 
 
 def test_dimensionar_equipes_lob_sucesso():
@@ -119,7 +118,7 @@ def test_dimensionar_equipes_lob_sucesso():
     assert r["numero_equipes"] == 2
 
 
-def test_dimensionar_equipes_lob_erro_vira_dict():
+def test_dimensionar_equipes_lob_erro_de_negocio_e_propagado():
     from mcp_gantt_lob import server
-    r = server.dimensionar_equipes_lob(tempo_unitario=0, ritmo_desejado=4)
-    assert "erro" in r
+    with pytest.raises(ValueError, match="tempo_unitario"):
+        server.dimensionar_equipes_lob(tempo_unitario=0, ritmo_desejado=4)
