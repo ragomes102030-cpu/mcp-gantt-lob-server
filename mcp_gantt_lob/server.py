@@ -226,6 +226,25 @@ def dimensionar_equipes_lob(tempo_unitario: float, ritmo_desejado: float) -> dic
     return _seguro(lambda: {"numero_equipes": dimensionar_equipes(tempo_unitario, ritmo_desejado)})
 
 
+@mcp.tool()
+def validar_lob_evidencia(
+    atividades: list[dict],
+) -> dict:
+    """Valida a base da LOB antes de calcular o ritmo."""
+    invalidas = []
+    sem_fonte = []
+    sem_premissa = []
+    for a in atividades:
+        nome = str(a.get("nome") or "")
+        try:
+            tempo = float(a.get("tempo_unitario"))
+        except (TypeError, ValueError):
+            tempo = 0
+        if tempo <= 0: invalidas.append(nome)
+        if not str(a.get("fonte") or "").strip(): sem_fonte.append(nome)
+        if not str(a.get("premissa") or "").strip(): sem_premissa.append(nome)
+    return {"valido": not invalidas, "total":len(atividades), "invalidas":invalidas, "sem_fonte":sem_fonte, "sem_premissa":sem_premissa, "regra":"LOB usa ritmos fornecidos pelo planejamento; o MCP não inventa produtividade"}
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     mcp.run(
