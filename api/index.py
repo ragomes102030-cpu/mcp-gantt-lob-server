@@ -8,6 +8,9 @@ from __future__ import annotations
 import hmac
 import json
 import os
+from contextlib import AsyncExitStack
+
+from public_mcp import public_app as _public_app
 
 _REQUIRED_DB = ()
 _MISSING = [key for key in ("MCP_API_TOKEN", *_REQUIRED_DB) if not os.environ.get(key)]
@@ -37,12 +40,29 @@ async def _empty_lifespan(receive, send):
             return
 
 
+async def _lifespan_both(receive, send):
+    """Start the public and private FastMCP session managers independently."""
+    event = await receive()
+    if event["type"] != "lifespan.startup":
+        return
+    try:
+        async with AsyncExitStack() as stack:
+            await stack.enter_async_context(_public_app.router.lifespan_context(_public_app))
+            if _mcp_app is not None:
+                await stack.enter_async_context(_mcp_app.router.lifespan_context(_mcp_app))
+            await send({"type": "lifespan.startup.complete"})
+            while True:
+                event = await receive()
+                if event["type"] == "lifespan.shutdown":
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
+    except Exception as exc:
+        await send({"type": "lifespan.startup.failed", "message": str(exc)})
+
+
 async def app(scope, receive, send):
     if scope["type"] == "lifespan":
-        if _mcp_app is None:
-            await _empty_lifespan(receive, send)
-        else:
-            await _mcp_app(scope, receive, send)
+        await _lifespan_both(receive, send)
         return
     if scope["type"] != "http":
         return
@@ -50,6 +70,14 @@ async def app(scope, receive, send):
     if path in ("/healthz", "/api/healthz"):
         configured = not bool(_MISSING)
         await _send_json(send, 200 if configured else 503, {"ok": configured, "configured": configured})
+        return
+    # Public endpoint has its OWN tools and no access to project storage.
+    # Private /mcp and /internal/eap-node still require MCP_API_TOKEN.
+    if path == "/public-mcp":
+        public_scope = dict(scope)
+        public_scope["path"] = "/mcp"
+        public_scope["raw_path"] = b"/mcp"
+        await _public_app(public_scope, receive, send)
         return
     if path not in ("/mcp", "/api/index"):
         await _send_json(send, 404, {"ok": False, "error": "Not found"})
