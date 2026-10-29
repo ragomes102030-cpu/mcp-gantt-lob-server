@@ -35,3 +35,13 @@ jobs:
           check https://arquimedes-mcp-cronograma.vercel.app/mcp 401
           check https://arquimedes-mcp-gantt-lob.vercel.app/mcp 401
           check https://arquimedes-mcp-eap.vercel.app/internal/eap-node 401
+          check_post() {
+            local url="$1"
+            local actual
+            actual="$(curl -L -sS --max-time 20 -o /tmp/mcp-smoke-response -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{}' "$url")"
+            echo "POST $url -> $actual (esperado: 401)"
+            test "$actual" = "401"
+          }
+          check_post https://arquimedes-mcp-eap.vercel.app/mcp
+          check_post https://arquimedes-mcp-cronograma.vercel.app/mcp
+          check_post https://arquimedes-mcp-gantt-lob.vercel.app/mcp
