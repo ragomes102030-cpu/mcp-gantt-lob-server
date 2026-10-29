@@ -34,7 +34,12 @@ jobs:
                   "Accept":"application/json, text/event-stream",
                   "Content-Type":"application/json",
               },method="POST")
-              with urllib.request.urlopen(req,timeout=30) as r:
+              try:
+                  response=urllib.request.urlopen(req,timeout=30)
+              except urllib.error.HTTPError as exc:
+                  error_body=exc.read().decode("utf-8",errors="replace")[:800]
+                  raise AssertionError(f"{url} -> HTTP {exc.code}: {error_body}") from exc
+              with response as r:
                   payload=r.read()
                   print(url, r.status, r.headers.get("content-type"),len(payload),flush=True)
                   assert r.status==200
