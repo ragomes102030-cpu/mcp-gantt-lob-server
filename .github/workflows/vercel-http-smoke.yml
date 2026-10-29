@@ -28,9 +28,10 @@ jobs:
               exit 1
             fi
           }
-          check https://arquimedes-mcp-eap.vercel.app/healthz 503
-          check https://arquimedes-mcp-cronograma.vercel.app/healthz 503
+          check https://arquimedes-mcp-eap.vercel.app/healthz 200
+          check https://arquimedes-mcp-cronograma.vercel.app/healthz 200
           check https://arquimedes-mcp-gantt-lob.vercel.app/healthz 200
-          check https://arquimedes-mcp-eap.vercel.app/mcp 503
-          check https://arquimedes-mcp-cronograma.vercel.app/mcp 503
+          check https://arquimedes-mcp-eap.vercel.app/mcp 401
+          check https://arquimedes-mcp-cronograma.vercel.app/mcp 401
           check https://arquimedes-mcp-gantt-lob.vercel.app/mcp 401
+          check https://arquimedes-mcp-eap.vercel.app/internal/eap-node 401
