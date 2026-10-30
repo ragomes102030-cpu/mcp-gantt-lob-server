@@ -43,6 +43,10 @@ class AtividadeInput:
     data_fim_prevista_real: date | None = None  # se None, assume sem atraso
     critico: bool = False  # folga zero no CPM
     hoje: date | None = None  # data de referência p/ calcular status; default = hoje real
+    activity_id: str | None = None  # stable, optional; legacy clients remain valid
+    eap_uid: str | None = None
+    location_id: str | None = None
+    baseline_id: str | None = None
 
 
 def _status_ranges(a: AtividadeInput, cor_planejado: str) -> list[DateRange]:
@@ -161,7 +165,8 @@ def gerar_gantt_xlsx(
 
     xlsx_bytes = chart.generate_excel_bytes()
     xlsx_bytes = _aplicar_agrupamento(xlsx_bytes, secoes_ordem, secoes_map)
-    return _marcar_criticas(xlsx_bytes, secoes_ordem, secoes_atividades)
+    xlsx_bytes = _marcar_criticas(xlsx_bytes, secoes_ordem, secoes_atividades)
+    return _incluir_rastreabilidade(xlsx_bytes, atividades)
 
 
 def _aplicar_agrupamento(
@@ -231,6 +236,35 @@ def _marcar_criticas(
     return buf_out.getvalue()
 
 
+def _incluir_rastreabilidade(xlsx_bytes: bytes, atividades: list[AtividadeInput]) -> bytes:
+    """Add a neutral, editable data sheet with stable IDs without altering
+    the visual Gantt or re-running CPM. Existing positional API is preserved.
+    """
+    import io
+    import openpyxl
+
+    def cell_text(value):
+        if value is None:
+            return ""
+        text = str(value)
+        # Prevent untrusted labels/IDs from turning into Excel formulas.
+        return "'" + text if text.startswith(("=", "+", "-", "@")) else text
+
+    wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes))
+    ws = wb.create_sheet("Rastreabilidade")
+    ws.append(["activity_id", "eap_uid", "location_id", "baseline_id",
+               "nome", "secao", "data_inicio", "data_fim_planejada", "progresso"])
+    for a in atividades:
+        ws.append([cell_text(a.activity_id), cell_text(a.eap_uid),
+                   cell_text(a.location_id), cell_text(a.baseline_id),
+                   cell_text(a.nome), cell_text(a.secao),
+                   a.data_inicio, a.data_fim_planejada, a.progresso])
+    ws.freeze_panes = "A2"
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def gerar_gantt_base64(
     project_name: str,
     atividades: list[AtividadeInput],
@@ -278,4 +312,8 @@ def atividade_from_dict(d: dict[str, Any]) -> AtividadeInput:
         data_inicio=inicio, data_fim_planejada=planejado,
         progresso=progresso, data_fim_prevista_real=previsto,
         critico=bool(d.get("critico", False)),
+        activity_id=d.get("activity_id"),
+        eap_uid=d.get("eap_uid"),
+        location_id=d.get("location_id"),
+        baseline_id=d.get("baseline_id"),
     )
