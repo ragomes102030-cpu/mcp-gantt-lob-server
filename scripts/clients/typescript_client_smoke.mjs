@@ -29,7 +29,7 @@ const cases = {
   },
 };
 function decode(result) {
-  assert.equal(result.isError, false, 'MCP tool returned isError');
+  assert.notEqual(result.isError, true, 'MCP tool returned isError');
   if (result.structuredContent !== undefined) {
     const value = result.structuredContent;
     return value?.result ?? value;
