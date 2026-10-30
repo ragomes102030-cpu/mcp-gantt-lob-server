@@ -65,6 +65,21 @@ def dimensionar_equipes_lob(tempo_unitario:float,ritmo_desejado:float)->dict:
     return {"numero_equipes":_dimensionar(tempo_unitario,ritmo_desejado),"persistido":False}
 
 @public_mcp.tool()
+def calcular_lob_com_vinculos(
+    atividades: list[dict], locais: list[str], dependencias: list[dict],
+    data_inicio: str | None = None, calendario: dict | None = None,
+    restricoes_inicio: list[dict] | None = None,
+) -> dict:
+    """LOB de atividades x locais com vinculos TI explicitos, equipes e calendario opcional.
+
+    Entrada stateless: activity_id, eap_uid (opcional), duration e location_id;
+    sem acesso a bancos, obra real ou outros servidores MCP.
+    """
+    from mcp_gantt_lob.models.lob_rede import calcular_lob_com_vinculos as calcular
+    return calcular(atividades, locais, dependencias, data_inicio, calendario, restricoes_inicio)
+
+
+@public_mcp.tool()
 def listar_temas()->list[str]:
     """Lista os temas disponiveis no Gantt, sem acessar historico de exports."""
     return ["ocean","slate","forest","amber","crimson","midnight","royal_purple","teal"]
