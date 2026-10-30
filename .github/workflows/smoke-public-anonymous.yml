@@ -61,12 +61,12 @@ jobs:
               try:
                   with urllib.request.urlopen(req,timeout=20) as rr:
                       print("GET_SSE",label,rr.status,rr.headers.get("content-type"),flush=True)
-                      assert rr.status==200 and "text/event-stream" in rr.headers.get("content-type","")
+                      raise AssertionError("Stateless SSE GET should return 405 instead of holding a serverless connection open")
               except urllib.error.HTTPError as ex:
                   # Stateless FastMCP v4 correctly responds 405 when it does not
                   # offer the optional server-to-client SSE listener (MCP spec).
                   print("GET_SSE",label,ex.code,flush=True)
-                  assert label=="gantt" and ex.code==405
+                  assert ex.code==405
           for label,origin in hosts.items():
               url=origin+"/public-mcp"
               initial=post(url,{"jsonrpc":"2.0","id":1,"method":"initialize","params":{
