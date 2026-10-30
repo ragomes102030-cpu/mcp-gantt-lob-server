@@ -38,7 +38,7 @@ def test_lob_three_floors_independent_hand_reference(record_property):
         "inicio_alvenaria":[u["inicio_dia"] for u in by_name["Alvenaria"]["unidades"]]
     }))
     record_property("difference", "0")
-    record_property("tolerance", "1e-6"
+    record_property("tolerance", "1e-6")
 
 
 def test_lob_unequal_ritms_no_overlapping_crew():
