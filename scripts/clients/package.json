@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Read-only MCP interoperability test client",
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.4.0"
+  }
+}

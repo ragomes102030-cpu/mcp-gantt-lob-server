@@ -1,0 +1,92 @@
+name: Smoke public MCP anonymous (no secrets)
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-mcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify anonymous MCP initialize, tools and safe calls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, urllib.request, urllib.error
+          hosts = {
+              "eap": "https://arquimedes-mcp-eap.vercel.app",
+              "cronograma": "https://arquimedes-mcp-cronograma.vercel.app",
+              "gantt": "https://arquimedes-mcp-gantt-lob.vercel.app",
+          }
+          cases = {
+              "eap": ("avaliar_evidencia_eap", {"itens":[{"quantidade":3,"produtividade":2,"fonte":"teste","responsavel":"eng","criterio_aceite":"ok"}]}),
+              "cronograma": ("calcular_duracao_com_evidencia", {"quantidade":12,"produtividade":3,"unidade":"m2","unidade_produtividade":"m2"}),
+              "gantt": ("dimensionar_equipes_lob", {"tempo_unitario":6,"ritmo_desejado":2}),
+          }
+          def post(url, data):
+              body = json.dumps(data).encode()
+              req=urllib.request.Request(url,body,headers={
+                  "Accept":"application/json, text/event-stream",
+                  "Content-Type":"application/json",
+              },method="POST")
+              try:
+                  response=urllib.request.urlopen(req,timeout=30)
+              except urllib.error.HTTPError as exc:
+                  error_body=exc.read().decode("utf-8",errors="replace")[:800]
+                  raise AssertionError(f"{url} -> HTTP {exc.code}: {error_body}") from exc
+              with response as r:
+                  payload=r.read()
+                  print(url, r.status, r.headers.get("content-type"),len(payload),flush=True)
+                  assert r.status==200
+                  return json.loads(payload)
+          # Claude checks ordinary GET/HEAD while discovering the connector.
+          for label,origin in hosts.items():
+              for path in ("/public-mcp", "/public-mcp/"):
+                  for accept in ("application/json", "*/*"):
+                      req=urllib.request.Request(origin+path,headers={"Accept":accept},method="GET")
+                      with urllib.request.urlopen(req,timeout=20) as rr:
+                          body=json.loads(rr.read())
+                          print("GET_DISCOVERY",label,path,accept,rr.status,body,flush=True)
+                          assert rr.status==200 and body.get("transport")=="streamable-http"
+              req=urllib.request.Request(origin+"/public-mcp",method="HEAD")
+              with urllib.request.urlopen(req,timeout=20) as rr:
+                  print("HEAD_DISCOVERY",label,rr.status,flush=True)
+                  assert rr.status==200
+              req=urllib.request.Request(origin+"/public-mcp",headers={"Accept":"text/event-stream"},method="GET")
+              try:
+                  with urllib.request.urlopen(req,timeout=20) as rr:
+                      print("GET_SSE",label,rr.status,rr.headers.get("content-type"),flush=True)
+                      raise AssertionError("Stateless SSE GET should return 405 instead of holding a serverless connection open")
+              except urllib.error.HTTPError as ex:
+                  # Stateless FastMCP v4 correctly responds 405 when it does not
+                  # offer the optional server-to-client SSE listener (MCP spec).
+                  print("GET_SSE",label,ex.code,flush=True)
+                  assert ex.code==405
+          for label,origin in hosts.items():
+              url=origin+"/public-mcp"
+              initial=post(url,{"jsonrpc":"2.0","id":1,"method":"initialize","params":{
+                  "protocolVersion":"2025-03-26",
+                  "capabilities":{},
+                  "clientInfo":{"name":"anonymous-smoke","version":"1.0"}}})
+              assert "result" in initial and initial["result"].get("serverInfo"),initial
+              listed=post(url,{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}})
+              names={t["name"] for t in listed["result"]["tools"]}
+              expected,args=cases[label]
+              assert expected in names,(label,names)
+              assert names.isdisjoint({"deletar_projeto","criar_atividade","criar_eap_node","salvar_baseline","listar_exports"}),names
+              called=post(url,{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":expected,"arguments":args}})
+              assert "result" in called and not called["result"].get("isError"),called
+              print(label,"tools",sorted(names),"CALL_OK (no auth, no Turso)",flush=True)
+              req=urllib.request.Request(origin+"/mcp",b'{}',headers={"Content-Type":"application/json"},method="POST")
+              try:
+                  urllib.request.urlopen(req,timeout=30)
+                  raise AssertionError("Private MCP did not deny unauthenticated request")
+              except urllib.error.HTTPError as err:
+                  assert err.code==401,(label,err.code)
+              print(label,"PRIVATE_401_OK",flush=True)
+          PY
