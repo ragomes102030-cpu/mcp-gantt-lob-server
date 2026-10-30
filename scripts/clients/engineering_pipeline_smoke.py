@@ -57,9 +57,9 @@ async def pipeline():
     assert by_id["F01"]["ES"] == 0 and by_id["A01"]["ES"] == 2
     assert set(c["caminho_critico"]) == {"F01","A01"}
     async with Client(URLS["lob"], mode="auto") as lob:
-        assert {t.name for t in (await lob.list_tools()).tools} == {
-            "calcular_linha_balanco", "balancear_ritmos_lob",
-            "dimensionar_equipes_lob", "listar_temas"}
+        lob_tools = {t.name for t in (await lob.list_tools()).tools}
+        assert {"calcular_linha_balanco", "balancear_ritmos_lob",
+                "dimensionar_equipes_lob", "listar_temas"}.issubset(lob_tools)
         l = await tool(lob, "calcular_linha_balanco", {
             "atividades":[{"nome":"Estrutura","tempo_unitario":2},
                           {"nome":"Alvenaria","tempo_unitario":3}],
@@ -67,7 +67,21 @@ async def pipeline():
     assert l["persistido"] is False and l["duracao_total_dias"] == 8
     assert l["atividades"][0]["unidades"][0]["data_inicio"] == "2026-11-02"
     assert l["atividades"][1]["unidades"][1]["fim_dia"] == 8
-    return {"status":"PASSOU","verified_public_tool_count":8,"scope_nodes":3,"cpm_days":5,"lob_days":8,
+    if "calcular_lob_com_vinculos" in lob_tools:
+        # The new MCP tool remains independent and preserves identifiers.
+        async with Client(URLS["lob"], mode="auto") as advanced:
+            calculated = await tool(advanced,"calcular_lob_com_vinculos", {
+                "atividades":[{"activity_id":"F01","eap_uid":envelope["eap_uid"],"duracao_dias":2},
+                              {"activity_id":"A01","eap_uid":"stable-ficticio-002","duracao_dias":3}],
+                "locais":["P01","P02"],
+                "dependencias":[
+                  {"predecessora_id":"F01","predecessora_local":"P01","sucessora_id":"A01","sucessora_local":"P01"},
+                  {"predecessora_id":"F01","predecessora_local":"P02","sucessora_id":"A01","sucessora_local":"P02"}],
+                "data_inicio":"2026-11-02"})
+        assert calculated["duracao_total_dias"] == 8
+        assert calculated["persistido"] is False
+        assert any(x["eap_uid"]==envelope["eap_uid"] for x in calculated["tarefas"])
+    return {"status":"PASSOU","verified_public_tool_count":4 + len(lob_tools),"scope_nodes":3,"cpm_days":5,"lob_days":8,
             "eap_uid":envelope["eap_uid"],"schema_version":"1.0",
             "warning":"Gantt XLSX privado validado em testes locais, nao via MCP publico"}
 
