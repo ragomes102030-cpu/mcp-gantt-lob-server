@@ -44,6 +44,17 @@ jobs:
                   print(url, r.status, r.headers.get("content-type"),len(payload),flush=True)
                   assert r.status==200
                   return json.loads(payload)
+          # Probe how Claude verifies the URL using GET before it initializes.
+          for label,origin in hosts.items():
+              for accept in ("text/event-stream","application/json","*/*"):
+                  req=urllib.request.Request(origin+"/public-mcp",headers={"Accept":accept},method="GET")
+                  try:
+                      with urllib.request.urlopen(req,timeout=4) as rr:
+                          print("GET_CHECK",label,accept,rr.status,rr.headers.get("content-type"),flush=True)
+                  except urllib.error.HTTPError as ex:
+                      print("GET_CHECK",label,accept,ex.code,ex.read(200).decode(errors="replace"),flush=True)
+                  except Exception as ex:
+                      print("GET_CHECK",label,accept,str(ex),flush=True)
           for label,origin in hosts.items():
               url=origin+"/public-mcp"
               initial=post(url,{"jsonrpc":"2.0","id":1,"method":"initialize","params":{
