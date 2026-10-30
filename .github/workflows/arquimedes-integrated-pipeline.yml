@@ -1,0 +1,44 @@
+name: Arquimedes integrated MCP engineering pipeline
+on:
+  push:
+    branches: [audit/engineering-benchmark-p2-20261030, main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stateless-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EAP_PUBLIC_MCP_URL: https://arquimedes-mcp-eap.vercel.app/public-mcp
+      CRONOGRAMA_PUBLIC_MCP_URL: https://arquimedes-mcp-cronograma.vercel.app/public-mcp
+      GANTT_LOB_PUBLIC_MCP_URL: https://arquimedes-mcp-gantt-lob.vercel.app/public-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install official MCP client
+        run: python -m pip install 'mcp==2.3.0'
+      - name: Real fictitious EAP / CPM / LOB integration (no writes)
+        run: |
+          python scripts/clients/engineering_pipeline_smoke.py | tee integration-result.jsonl
+      - name: Simulate MCP outage: must fail closed (not fabricate)
+        run: |
+          set +e
+          python scripts/clients/engineering_pipeline_smoke.py --simulate-unavailable | tee outage-result.jsonl
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -eq 2
+          grep -q '"status": "BLOQUEADO"' outage-result.jsonl
+          grep -q '"no_fallback_calculation": true' outage-result.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arquimedes-engineering-integrated-pipeline
+          path: |
+            integration-result.jsonl
+            outage-result.jsonl
+          if-no-files-found: warn
