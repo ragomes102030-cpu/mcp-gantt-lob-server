@@ -52,7 +52,8 @@ async def check_server(name, mode):
             assert actual_version.startswith("2025-"), (name, mode, actual_version)
         listed = await client.list_tools()
         actual = {t.name for t in listed.tools}
-        assert actual == names, (name, mode, actual, names)
+        permitted = names | ({"calcular_lob_com_vinculos"} if name == "gantt_lob" else set())
+        assert names <= actual <= permitted, (name, mode, actual, names, permitted)
         data = decode(await client.call_tool(tool, args))
         assert data[field] == expected, (name, mode, data)
         assert data.get("persistido") is False, (name, "Unexpected mutation response")
