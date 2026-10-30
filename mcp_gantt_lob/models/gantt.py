@@ -19,6 +19,7 @@ Marco (milestone): quando data_inicio == data_fim na atividade de entrada.
 from __future__ import annotations
 
 import base64
+import math
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -42,6 +43,10 @@ class AtividadeInput:
     data_fim_prevista_real: date | None = None  # se None, assume sem atraso
     critico: bool = False  # folga zero no CPM
     hoje: date | None = None  # data de referência p/ calcular status; default = hoje real
+    activity_id: str | None = None  # stable, optional; legacy clients remain valid
+    eap_uid: str | None = None
+    location_id: str | None = None
+    baseline_id: str | None = None
 
 
 def _status_ranges(a: AtividadeInput, cor_planejado: str) -> list[DateRange]:
@@ -81,6 +86,12 @@ def _dt(d: date) -> datetime:
     return datetime(d.year, d.month, d.day)
 
 
+def _xlsx_safe_text(value: str) -> str:
+    """Do not let an untrusted engineering label turn into a spreadsheet formula."""
+    text = str(value)
+    return "'" + text if text.startswith(("=", "+", "-", "@")) else text
+
+
 def gerar_gantt_xlsx(
     project_name: str,
     atividades: list[AtividadeInput],
@@ -106,6 +117,17 @@ def gerar_gantt_xlsx(
     """
     if not atividades:
         raise ValueError("Lista de atividades vazia — nada para gerar.")
+    for a in atividades:
+        try:
+            progresso = float(a.progresso)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{a.nome}: progresso invalido") from exc
+        if not math.isfinite(progresso) or not 0 <= progresso <= 100:
+            raise ValueError(f"{a.nome}: progresso deve estar entre 0 e 100, finito.")
+        if a.data_fim_planejada < a.data_inicio:
+            raise ValueError(f"{a.nome}: data_fim_planejada anterior ao inicio.")
+        if a.data_fim_prevista_real is not None and a.data_fim_prevista_real < a.data_inicio:
+            raise ValueError(f"{a.nome}: data_fim_prevista_real anterior ao inicio.")
 
     style: GanttStyle = GanttTheme.from_color(cor_marca) if cor_marca else GanttTheme.get(tema)
     cor_planejado = style.bar_color
@@ -125,14 +147,14 @@ def gerar_gantt_xlsx(
             secoes_ordem.append(a.secao)
 
         task = Task(
-            name=a.nome,
+            name=_xlsx_safe_text(a.nome),
             progress=a.progresso,
             ranges=_status_ranges(a, cor_planejado),
         )
         secoes_map[a.secao].append(task)
         secoes_atividades[a.secao].append(a)
 
-    sections = [Section(name=nome, tasks=secoes_map[nome]) for nome in secoes_ordem]
+    sections = [Section(name=_xlsx_safe_text(nome), tasks=secoes_map[nome]) for nome in secoes_ordem]
 
     data_inicio_geral = min(a.data_inicio for a in atividades)
     data_fim_geral = max(
@@ -149,7 +171,8 @@ def gerar_gantt_xlsx(
 
     xlsx_bytes = chart.generate_excel_bytes()
     xlsx_bytes = _aplicar_agrupamento(xlsx_bytes, secoes_ordem, secoes_map)
-    return _marcar_criticas(xlsx_bytes, secoes_ordem, secoes_atividades)
+    xlsx_bytes = _marcar_criticas(xlsx_bytes, secoes_ordem, secoes_atividades)
+    return _incluir_rastreabilidade(xlsx_bytes, atividades)
 
 
 def _aplicar_agrupamento(
@@ -219,6 +242,35 @@ def _marcar_criticas(
     return buf_out.getvalue()
 
 
+def _incluir_rastreabilidade(xlsx_bytes: bytes, atividades: list[AtividadeInput]) -> bytes:
+    """Add a neutral, editable data sheet with stable IDs without altering
+    the visual Gantt or re-running CPM. Existing positional API is preserved.
+    """
+    import io
+    import openpyxl
+
+    def cell_text(value):
+        if value is None:
+            return ""
+        text = str(value)
+        # Prevent untrusted labels/IDs from turning into Excel formulas.
+        return "'" + text if text.startswith(("=", "+", "-", "@")) else text
+
+    wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes))
+    ws = wb.create_sheet("Rastreabilidade")
+    ws.append(["activity_id", "eap_uid", "location_id", "baseline_id",
+               "nome", "secao", "data_inicio", "data_fim_planejada", "progresso"])
+    for a in atividades:
+        ws.append([cell_text(a.activity_id), cell_text(a.eap_uid),
+                   cell_text(a.location_id), cell_text(a.baseline_id),
+                   cell_text(a.nome), cell_text(a.secao),
+                   a.data_inicio, a.data_fim_planejada, a.progresso])
+    ws.freeze_panes = "A2"
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def gerar_gantt_base64(
     project_name: str,
     atividades: list[AtividadeInput],
@@ -250,12 +302,24 @@ def atividade_from_dict(d: dict[str, Any]) -> AtividadeInput:
     def _parse_data(v: str | None) -> date | None:
         return datetime.strptime(v, "%Y-%m-%d").date() if v else None
 
+    try:
+        progresso = float(d.get("progresso", 0))
+    except (ValueError, TypeError) as exc:
+        raise ValueError("progresso invalido") from exc
+    if not math.isfinite(progresso) or not 0 <= progresso <= 100:
+        raise ValueError("progresso deve estar entre 0 e 100, finito.")
+    inicio = _parse_data(d["data_inicio"])
+    planejado = _parse_data(d["data_fim_planejada"])
+    previsto = _parse_data(d.get("data_fim_prevista_real"))
+    if planejado < inicio or (previsto is not None and previsto < inicio):
+        raise ValueError("data final anterior a data_inicio")
     return AtividadeInput(
-        nome=d["nome"],
-        secao=d["secao"],
-        data_inicio=_parse_data(d["data_inicio"]),
-        data_fim_planejada=_parse_data(d["data_fim_planejada"]),
-        progresso=float(d.get("progresso", 0)),
-        data_fim_prevista_real=_parse_data(d.get("data_fim_prevista_real")),
+        nome=d["nome"], secao=d["secao"],
+        data_inicio=inicio, data_fim_planejada=planejado,
+        progresso=progresso, data_fim_prevista_real=previsto,
         critico=bool(d.get("critico", False)),
+        activity_id=d.get("activity_id"),
+        eap_uid=d.get("eap_uid"),
+        location_id=d.get("location_id"),
+        baseline_id=d.get("baseline_id"),
     )

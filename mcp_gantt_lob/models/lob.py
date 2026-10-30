@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 
@@ -43,12 +43,12 @@ class AtividadeLOB:
     pulmao_dias: float = 0.0  # espera mínima extra além da predecessora (buffer)
 
     def __post_init__(self) -> None:
-        if self.tempo_unitario <= 0:
-            raise ValueError(f"'{self.nome}': tempo_unitario deve ser > 0.")
-        if self.numero_equipes <= 0:
-            raise ValueError(f"'{self.nome}': numero_equipes deve ser >= 1.")
-        if self.pulmao_dias < 0:
-            raise ValueError(f"'{self.nome}': pulmao_dias não pode ser negativo.")
+        if not math.isfinite(self.tempo_unitario) or self.tempo_unitario <= 0:
+            raise ValueError(f"'{self.nome}': tempo_unitario deve ser positivo e finito.")
+        if type(self.numero_equipes) is not int or self.numero_equipes <= 0:
+            raise ValueError(f"'{self.nome}': numero_equipes deve ser inteiro >= 1.")
+        if not math.isfinite(self.pulmao_dias) or self.pulmao_dias < 0:
+            raise ValueError(f"'{self.nome}': pulmao_dias deve ser finito e >= 0.")
 
     @property
     def ritmo(self) -> float:
@@ -171,8 +171,14 @@ def calcular_linha_balanco(
                 "espera_dias": u.espera_dias,
             }
             if data_inicio is not None:
-                item["data_inicio"] = (data_inicio + timedelta(days=u.inicio_dia)).isoformat()
-                item["data_fim"] = (data_inicio + timedelta(days=u.fim_dia)).isoformat()
+                # date + fractional timedelta truncates sub-day precision.
+                # Keep legacy civil dates AND expose exact naive local datetimes.
+                inicio_exato = datetime.combine(data_inicio, time.min) + timedelta(days=u.inicio_dia)
+                fim_exato = datetime.combine(data_inicio, time.min) + timedelta(days=u.fim_dia)
+                item["data_inicio"] = inicio_exato.date().isoformat()
+                item["data_fim"] = fim_exato.date().isoformat()
+                item["data_hora_inicio"] = inicio_exato.isoformat()
+                item["data_hora_fim"] = fim_exato.isoformat()
             unidades_saida.append(item)
         saida_atividades.append({
             "nome": atividade.nome,
@@ -187,6 +193,11 @@ def calcular_linha_balanco(
         "duracao_total_dias": round(duracao_total_dias, 6),
         "total_unidades": len(unidades),
         "atividades": saida_atividades,
+        "convencao_temporal": (
+            "dias corridos desde marco zero; data_inicio/data_fim sao dias civis; "
+            "data_hora_inicio/data_hora_fim preservam fracoes de dia; "
+            "sem calendario de trabalho nem fuso horario"
+        ),
     }
 
 
@@ -198,10 +209,10 @@ def dimensionar_equipes(tempo_unitario: float, ritmo_desejado: float) -> int:
     ``numero_equipes = ceil(tempo_unitario / ritmo_desejado)`` — arredonda
     pra cima porque equipe é indivisível (não dá pra ter 1,3 equipe).
     """
-    if tempo_unitario <= 0:
-        raise ValueError("tempo_unitario deve ser > 0.")
-    if ritmo_desejado <= 0:
-        raise ValueError("ritmo_desejado deve ser > 0.")
+    if not math.isfinite(tempo_unitario) or tempo_unitario <= 0:
+        raise ValueError("tempo_unitario deve ser positivo e finito.")
+    if not math.isfinite(ritmo_desejado) or ritmo_desejado <= 0:
+        raise ValueError("ritmo_desejado deve ser positivo e finito.")
     return math.ceil(tempo_unitario / ritmo_desejado)
 
 
