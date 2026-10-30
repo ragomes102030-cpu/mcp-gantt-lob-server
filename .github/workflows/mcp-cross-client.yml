@@ -1,0 +1,53 @@
+name: MCP cross-client interoperability (Python and TypeScript)
+on:
+  push:
+    branches: [audit/mcp-interop-smoke-20261030]
+  pull_request:
+    branches: [feat/claude-public-readonly-20261029]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-clients:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      # Immutable Vercel preview deployments tested with SDK v2, not production.
+      EAP_PUBLIC_MCP_URL: https://arquimedes-mcp-ms50mrw5o-rafael-5864.vercel.app/public-mcp
+      CRONOGRAMA_PUBLIC_MCP_URL: https://arquimedes-mcp-cronograma-atn71hn43-rafael-5864.vercel.app/public-mcp
+      # Gantt/LOB modern-compatible preview at an immutable deployment URL.
+      GANTT_LOB_PUBLIC_MCP_URL: https://arquimedes-mcp-gantt-nmzxq6j0l-rafael-5864.vercel.app/public-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install official Python MCP client
+        run: python -m pip install 'mcp==2.3.0'
+      - name: Exercise legacy and modern with official Python MCP client
+        run: python scripts/clients/python_client_smoke.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install official TypeScript MCP v2 client
+        working-directory: scripts/clients
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Exercise legacy and modern with official TypeScript MCP client
+        run: node scripts/clients/typescript_client_smoke.mjs
+
+  browser-cors:
+    runs-on: ubuntu-latest
+    env:
+      MCP_PUBLIC_ALLOWED_ORIGINS: https://independent-client.example
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install server and test dependencies
+        run: python -m pip install -r requirements.txt -r requirements-dev.txt
+      - name: Verify public browser MCP CORS and private endpoint isolation
+        run: python -m pytest tests/test_public_mcp_cors.py -q
