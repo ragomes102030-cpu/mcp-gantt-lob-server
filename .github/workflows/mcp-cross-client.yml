@@ -1,7 +1,7 @@
 name: MCP cross-client interoperability (Python and TypeScript)
 on:
   push:
-    branches: [audit/mcp-interop-smoke-20261030]
+    branches: [feat/claude-public-readonly-20261029]
   pull_request:
     branches: [feat/claude-public-readonly-20261029]
   workflow_dispatch:
@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      # Immutable Vercel preview deployments tested with SDK v2, not production.
-      EAP_PUBLIC_MCP_URL: https://arquimedes-mcp-ms50mrw5o-rafael-5864.vercel.app/public-mcp
-      CRONOGRAMA_PUBLIC_MCP_URL: https://arquimedes-mcp-cronograma-atn71hn43-rafael-5864.vercel.app/public-mcp
-      # Gantt/LOB modern-compatible preview at an immutable deployment URL.
-      GANTT_LOB_PUBLIC_MCP_URL: https://arquimedes-mcp-gantt-nmzxq6j0l-rafael-5864.vercel.app/public-mcp
+      # Public production URLs; no real work data is accessed.
+      EAP_PUBLIC_MCP_URL: https://arquimedes-mcp-eap.vercel.app/public-mcp
+      CRONOGRAMA_PUBLIC_MCP_URL: https://arquimedes-mcp-cronograma.vercel.app/public-mcp
+      # Public Gantt/LOB production endpoint.
+      GANTT_LOB_PUBLIC_MCP_URL: https://arquimedes-mcp-gantt-lob.vercel.app/public-mcp
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -51,3 +51,37 @@ jobs:
         run: python -m pip install -r requirements.txt -r requirements-dev.txt
       - name: Verify public browser MCP CORS and private endpoint isolation
         run: python -m pytest tests/test_public_mcp_cors.py -q
+
+  production-security:
+    name: Stateless public calculation and private 401 (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: eap
+            url: https://arquimedes-mcp-eap.vercel.app
+          - service: cronograma
+            url: https://arquimedes-mcp-cronograma.vercel.app
+          - service: gantt_lob
+            url: https://arquimedes-mcp-gantt-lob.vercel.app
+    env:
+      MCP_TARGET: ${{ matrix.service }}
+      MCP_BASE_URL: ${{ matrix.url }}
+      MCP_REQUIRE_MODERN: "1"
+      MCP_REPORT_PATH: artifacts/production-${{ matrix.service }}.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Confirm live production legacy/modern MCP and private access denial
+        run: python scripts/check_public_mcp.py
+      - name: Archive production audit record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-mcp-${{ matrix.service }}
+          path: artifacts/production-${{ matrix.service }}.json
+          if-no-files-found: warn
