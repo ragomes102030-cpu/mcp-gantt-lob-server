@@ -124,4 +124,5 @@ def test_xlsx_preserves_stable_ids_and_escapes_formula_injection():
     assert trace["D2"].value == "BASE-2026-01"
     assert trace["E2"].data_type != "f"
     assert trace["E2"].value.startswith("'=HYPERLINK")
-    assert wb.active.cell(row=4, column=2).value == original.nome
+    assert wb.active.cell(row=4, column=2).value == "'" + original.nome
+    assert wb.active.cell(row=4, column=2).data_type != "f"
