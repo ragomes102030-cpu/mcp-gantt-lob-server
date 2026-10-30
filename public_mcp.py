@@ -22,11 +22,16 @@ def _validar_atividades(atividades:list[dict])->list[AtividadeLOB]:
         nome=str(a.get("nome") or "").strip()
         if not nome or len(nome)>100 or nome in nomes: raise ValueError("Nome ausente, duplicado ou longo")
         nomes.append(nome)
-        tempo=float(a["tempo_unitario"])
+        try:
+            tempo=float(a["tempo_unitario"])
+            pulmao=float(a.get("pulmao_dias",0))
+        except (KeyError,TypeError,ValueError) as exc:
+            raise ValueError("tempo_unitario/pulmao_dias ausente ou invalido") from exc
         equipes=a.get("numero_equipes",1)
-        pulmao=float(a.get("pulmao_dias",0))
-        if not all(math.isfinite(v) and 0<=v<=1e6 for v in (tempo,pulmao)):
-            raise ValueError("Tempos precisam ser finitos e limitados")
+        if not (math.isfinite(tempo) and 0 < tempo <= 1e6):
+            raise ValueError("tempo_unitario deve ser positivo, finito e limitado")
+        if not (math.isfinite(pulmao) and 0 <= pulmao <= 1e6):
+            raise ValueError("pulmao_dias deve ser nao negativo, finito e limitado")
         if type(equipes) is not int or not 1<=equipes<=100:
             raise ValueError("Numero de equipes deve ser inteiro de 1 a 100")
         result.append(AtividadeLOB(nome=nome,tempo_unitario=tempo,
@@ -39,10 +44,13 @@ def calcular_linha_balanco(atividades:list[dict],unidades:list[str],data_inicio:
     objs=_validar_atividades(atividades)
     if not isinstance(unidades,list) or not 1<=len(unidades)<=100 or len(objs)*len(unidades)>2000:
         raise ValueError("Informe 1-100 unidades e no maximo 2000 combinacoes.")
-    if any(not isinstance(x,str) or not x.strip() or len(x)>100 for x in unidades):
+    if any(not isinstance(x,str) or not x.strip() or len(x.strip())>100 for x in unidades):
         raise ValueError("Unidade invalida.")
+    unidades_limpas = [x.strip() for x in unidades]
+    if len({x.casefold() for x in unidades_limpas}) != len(unidades_limpas):
+        raise ValueError("Unidades repetidas (inclusive diferencas de espacos/maiusculas).")
     inicio=date.fromisoformat(data_inicio) if data_inicio else None
-    return {**_lob(objs,unidades,data_inicio=inicio),"persistido":False}
+    return {**_lob(objs,unidades_limpas,data_inicio=inicio),"persistido":False}
 
 @public_mcp.tool()
 def balancear_ritmos_lob(atividades:list[dict])->dict:
