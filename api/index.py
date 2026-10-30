@@ -11,6 +11,7 @@ import os
 from contextlib import AsyncExitStack
 
 from public_mcp import public_app as _public_app
+from mcp_public_origins import allowed_public_origins
 
 _REQUIRED_DB = ()
 _MISSING = [key for key in ("MCP_API_TOKEN", *_REQUIRED_DB) if not os.environ.get(key)]
@@ -61,23 +62,25 @@ async def _lifespan_both(receive, send):
 
 
 
-# Only the stateless anonymous calculation endpoint may be called from a
-# browser origin. Private /mcp retains its authentication and no open CORS.
+# CORS is opt-in and scoped to the stateless PUBLIC MCP only.
+# Private /mcp must never inherit these response headers.
 _PUBLIC_CORS = (
-    (b"access-control-allow-origin", b"*"),
     (b"access-control-allow-methods", b"POST, GET, HEAD, OPTIONS"),
     (b"access-control-allow-headers",
      b"Accept, Content-Type, MCP-Protocol-Version, Mcp-Method, Mcp-Name, "
      b"Mcp-Session-Id, Last-Event-ID"),
     (b"access-control-expose-headers", b"MCP-Protocol-Version, Mcp-Session-Id"),
     (b"access-control-max-age", b"600"),
+    (b"vary", b"Origin"),
 )
 
 
-def _public_cors_sender(send):
+def _public_cors_sender(send, origin):
     async def send_public(message):
-        if message["type"] == "http.response.start":
-            message = dict(message, headers=list(message.get("headers", [])) + list(_PUBLIC_CORS))
+        if message["type"] == "http.response.start" and origin:
+            message = dict(message, headers=list(message.get("headers", []))
+                           + list(_PUBLIC_CORS)
+                           + [(b"access-control-allow-origin", origin)])
         await send(message)
 
     return send_public
@@ -97,7 +100,12 @@ async def app(scope, receive, send):
     # Public endpoint has its OWN tools and no access to project storage.
     # Private /mcp and /internal/eap-node still require MCP_API_TOKEN.
     if path.rstrip("/") == "/public-mcp":
-        send_public = _public_cors_sender(send)
+        origin = next((value for key, value in scope.get("headers", [])
+                       if key.lower() == b"origin"), b"")
+        if origin and origin.decode("utf-8", "replace").lower() not in allowed_public_origins():
+            await _send_json(send, 403, {"ok": False, "error": "Origin not allowed"})
+            return
+        send_public = _public_cors_sender(send, origin)
         # Claude may first probe the URL with an ordinary GET/HEAD before
         # negotiating MCP Streamable HTTP. Such probes need a stable success
         # status; real SSE GET and JSON-RPC POST continue to the MCP transport.
