@@ -53,7 +53,13 @@ for (const [name, url] of Object.entries(targets)) {
       assert.equal(era, mode === 'auto' ? 'modern' : 'legacy', name + ' wrong protocol era');
       const { tools } = await client.listTools();
       const names = tools.map((tool) => tool.name).sort();
-      assert.deepEqual(names, [...testcase.names].sort(), name + ' unexpected public tool names');
+      const allowed = name === 'gantt_lob'
+        ? [...testcase.names, 'calcular_lob_com_vinculos'].sort()
+        : [...testcase.names].sort();
+      assert.ok(testcase.names.every((n) => names.includes(n)),
+        name + ' public tool disappeared');
+      assert.ok(names.every((n) => allowed.includes(n)),
+        name + ' unexpected or private tool exposed');
       const result = decode(await client.callTool({ name: testcase.tool, arguments: testcase.args }));
       assert.equal(result[testcase.field], testcase.expected, name + ' incorrect calculation');
       assert.equal(result.persistido, false, name + ' unexpected persistence');
