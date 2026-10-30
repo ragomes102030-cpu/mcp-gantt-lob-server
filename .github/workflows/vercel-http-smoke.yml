@@ -1,0 +1,47 @@
+name: Smoke HTTP dos 3 MCPs na Vercel
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  http-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verificar rotas HTTPS e acesso anonimo (sem segredos)
+        shell: bash
+        run: |
+          set -euo pipefail
+          check() {
+            local url="$1"
+            local expected="$2"
+            local actual
+            actual="$(curl -L -sS --max-time 20 -o /tmp/mcp-smoke-response -w '%{http_code}' "$url")"
+            echo "$url -> $actual (esperado: $expected)"
+            if [ "$actual" != "$expected" ]; then
+              echo "Resposta:"
+              head -c 400 /tmp/mcp-smoke-response || true
+              exit 1
+            fi
+          }
+          check https://arquimedes-mcp-eap.vercel.app/healthz 200
+          check https://arquimedes-mcp-cronograma.vercel.app/healthz 200
+          check https://arquimedes-mcp-gantt-lob.vercel.app/healthz 200
+          check https://arquimedes-mcp-eap.vercel.app/mcp 401
+          check https://arquimedes-mcp-cronograma.vercel.app/mcp 401
+          check https://arquimedes-mcp-gantt-lob.vercel.app/mcp 401
+          check https://arquimedes-mcp-eap.vercel.app/internal/eap-node 401
+          check_post() {
+            local url="$1"
+            local actual
+            actual="$(curl -L -sS --max-time 20 -o /tmp/mcp-smoke-response -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{}' "$url")"
+            echo "POST $url -> $actual (esperado: 401)"
+            test "$actual" = "401"
+          }
+          check_post https://arquimedes-mcp-eap.vercel.app/mcp
+          check_post https://arquimedes-mcp-cronograma.vercel.app/mcp
+          check_post https://arquimedes-mcp-gantt-lob.vercel.app/mcp
