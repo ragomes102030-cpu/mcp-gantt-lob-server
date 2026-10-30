@@ -86,6 +86,12 @@ def _dt(d: date) -> datetime:
     return datetime(d.year, d.month, d.day)
 
 
+def _xlsx_safe_text(value: str) -> str:
+    """Do not let an untrusted engineering label turn into a spreadsheet formula."""
+    text = str(value)
+    return "'" + text if text.startswith(("=", "+", "-", "@")) else text
+
+
 def gerar_gantt_xlsx(
     project_name: str,
     atividades: list[AtividadeInput],
@@ -141,14 +147,14 @@ def gerar_gantt_xlsx(
             secoes_ordem.append(a.secao)
 
         task = Task(
-            name=a.nome,
+            name=_xlsx_safe_text(a.nome),
             progress=a.progresso,
             ranges=_status_ranges(a, cor_planejado),
         )
         secoes_map[a.secao].append(task)
         secoes_atividades[a.secao].append(a)
 
-    sections = [Section(name=nome, tasks=secoes_map[nome]) for nome in secoes_ordem]
+    sections = [Section(name=_xlsx_safe_text(nome), tasks=secoes_map[nome]) for nome in secoes_ordem]
 
     data_inicio_geral = min(a.data_inicio for a in atividades)
     data_fim_geral = max(
