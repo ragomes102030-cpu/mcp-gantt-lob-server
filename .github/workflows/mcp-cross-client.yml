@@ -15,10 +15,10 @@ jobs:
     timeout-minutes: 12
     env:
       # Immutable Vercel preview deployments tested with SDK v2, not production.
-      EAP_PUBLIC_MCP_URL: https://arquimedes-mcp-n48vlbdcd-rafael-5864.vercel.app/public-mcp
-      CRONOGRAMA_PUBLIC_MCP_URL: https://arquimedes-mcp-cronograma-mepps2cq9-rafael-5864.vercel.app/public-mcp
-      # Gantt/LOB is already modern-compatible on the active public endpoint.
-      GANTT_LOB_PUBLIC_MCP_URL: https://arquimedes-mcp-gantt-lob.vercel.app/public-mcp
+      EAP_PUBLIC_MCP_URL: https://arquimedes-mcp-ms50mrw5o-rafael-5864.vercel.app/public-mcp
+      CRONOGRAMA_PUBLIC_MCP_URL: https://arquimedes-mcp-cronograma-atn71hn43-rafael-5864.vercel.app/public-mcp
+      # Gantt/LOB modern-compatible preview at an immutable deployment URL.
+      GANTT_LOB_PUBLIC_MCP_URL: https://arquimedes-mcp-gantt-nmzxq6j0l-rafael-5864.vercel.app/public-mcp
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
