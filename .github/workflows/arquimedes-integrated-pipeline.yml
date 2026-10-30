@@ -25,7 +25,7 @@ jobs:
       - name: Real fictitious EAP / CPM / LOB integration (no writes)
         run: |
           python scripts/clients/engineering_pipeline_smoke.py | tee integration-result.jsonl
-      - name: Simulate MCP outage: must fail closed (not fabricate)
+      - name: "Simulate MCP outage — fail closed without fabricated results"
         run: |
           set +e
           python scripts/clients/engineering_pipeline_smoke.py --simulate-unavailable | tee outage-result.jsonl
