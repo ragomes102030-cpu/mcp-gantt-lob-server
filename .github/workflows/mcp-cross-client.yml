@@ -39,6 +39,8 @@ jobs:
 
   browser-cors:
     runs-on: ubuntu-latest
+    env:
+      MCP_PUBLIC_ALLOWED_ORIGINS: https://independent-client.example
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
