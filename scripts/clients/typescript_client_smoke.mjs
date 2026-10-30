@@ -55,7 +55,9 @@ for (const [name, url] of Object.entries(targets)) {
       const names = tools.map((tool) => tool.name).sort();
       const allowed = name === 'gantt_lob'
         ? [...testcase.names, 'calcular_lob_com_vinculos'].sort()
-        : [...testcase.names].sort();
+        : name === 'cronograma'
+          ? [...testcase.names, 'calcular_cpm_com_calendario'].sort()
+          : [...testcase.names].sort();
       assert.ok(testcase.names.every((n) => names.includes(n)),
         name + ' public tool disappeared');
       assert.ok(names.every((n) => allowed.includes(n)),

@@ -47,8 +47,10 @@ async def pipeline():
             {"eap_id":"1.2","parent_id":"1","nivel":2}]})
     assert r["ok"] is True and r["total_nos"] == 3 and r["persistido"] is False
     async with Client(URLS["cron"], mode="auto") as cron:
-        assert {t.name for t in (await cron.list_tools()).tools} == {
-            "calcular_duracao_com_evidencia", "calcular_cpm_com_evidencia"}
+        cron_tools = {t.name for t in (await cron.list_tools()).tools}
+        required = {"calcular_duracao_com_evidencia", "calcular_cpm_com_evidencia"}
+        allowed = required | {"calcular_cpm_com_calendario"}
+        assert required <= cron_tools <= allowed
         c = await tool(cron, "calcular_cpm_com_evidencia", {
             "atividades":[{"id":"F01","duracao_dias":2},{"id":"A01","duracao_dias":3}],
             "dependencias":[{"predecessora_id":"F01","sucessora_id":"A01","tipo":"TI","lag_dias":0}]})
