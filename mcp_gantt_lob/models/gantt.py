@@ -19,6 +19,7 @@ Marco (milestone): quando data_inicio == data_fim na atividade de entrada.
 from __future__ import annotations
 
 import base64
+import math
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -106,6 +107,17 @@ def gerar_gantt_xlsx(
     """
     if not atividades:
         raise ValueError("Lista de atividades vazia — nada para gerar.")
+    for a in atividades:
+        try:
+            progresso = float(a.progresso)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{a.nome}: progresso invalido") from exc
+        if not math.isfinite(progresso) or not 0 <= progresso <= 100:
+            raise ValueError(f"{a.nome}: progresso deve estar entre 0 e 100, finito.")
+        if a.data_fim_planejada < a.data_inicio:
+            raise ValueError(f"{a.nome}: data_fim_planejada anterior ao inicio.")
+        if a.data_fim_prevista_real is not None and a.data_fim_prevista_real < a.data_inicio:
+            raise ValueError(f"{a.nome}: data_fim_prevista_real anterior ao inicio.")
 
     style: GanttStyle = GanttTheme.from_color(cor_marca) if cor_marca else GanttTheme.get(tema)
     cor_planejado = style.bar_color
@@ -250,12 +262,20 @@ def atividade_from_dict(d: dict[str, Any]) -> AtividadeInput:
     def _parse_data(v: str | None) -> date | None:
         return datetime.strptime(v, "%Y-%m-%d").date() if v else None
 
+    try:
+        progresso = float(d.get("progresso", 0))
+    except (ValueError, TypeError) as exc:
+        raise ValueError("progresso invalido") from exc
+    if not math.isfinite(progresso) or not 0 <= progresso <= 100:
+        raise ValueError("progresso deve estar entre 0 e 100, finito.")
+    inicio = _parse_data(d["data_inicio"])
+    planejado = _parse_data(d["data_fim_planejada"])
+    previsto = _parse_data(d.get("data_fim_prevista_real"))
+    if planejado < inicio or (previsto is not None and previsto < inicio):
+        raise ValueError("data final anterior a data_inicio")
     return AtividadeInput(
-        nome=d["nome"],
-        secao=d["secao"],
-        data_inicio=_parse_data(d["data_inicio"]),
-        data_fim_planejada=_parse_data(d["data_fim_planejada"]),
-        progresso=float(d.get("progresso", 0)),
-        data_fim_prevista_real=_parse_data(d.get("data_fim_prevista_real")),
+        nome=d["nome"], secao=d["secao"],
+        data_inicio=inicio, data_fim_planejada=planejado,
+        progresso=progresso, data_fim_prevista_real=previsto,
         critico=bool(d.get("critico", False)),
     )
