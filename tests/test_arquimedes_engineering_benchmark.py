@@ -16,7 +16,7 @@ from mcp_gantt_lob.models.lob import (
 )
 
 
-def test_lob_three_floors_independent_hand_reference():
+def test_lob_three_floors_independent_hand_reference(record_property):
     # Foundation A tr=4: 0-4,4-8,8-12.
     # Masonry B tr=6: 4-10,10-16,16-22.
     out = calcular_linha_balanco(
@@ -31,6 +31,14 @@ def test_lob_three_floors_independent_hand_reference():
     assert out["duracao_total_dias"] == 22
     assert by_name["Alvenaria"]["risco_interferencia"] is False
     assert by_name["Fundacao"]["unidades"][0]["data_inicio"] == "2026-11-02"
+    record_property("expected", '{"duracao_total_dias":22,"inicio_fundacao":[0,4,8],"inicio_alvenaria":[4,10,16]}')
+    record_property("obtained", str({
+        "duracao_total_dias": out["duracao_total_dias"],
+        "inicio_fundacao":[u["inicio_dia"] for u in by_name["Fundacao"]["unidades"]],
+        "inicio_alvenaria":[u["inicio_dia"] for u in by_name["Alvenaria"]["unidades"]]
+    }))
+    record_property("difference", "0")
+    record_property("tolerance", "1e-6"
 
 
 def test_lob_unequal_ritms_no_overlapping_crew():
