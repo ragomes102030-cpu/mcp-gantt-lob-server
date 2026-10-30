@@ -44,17 +44,23 @@ jobs:
                   print(url, r.status, r.headers.get("content-type"),len(payload),flush=True)
                   assert r.status==200
                   return json.loads(payload)
-          # Probe how Claude verifies the URL using GET before it initializes.
+          # Claude checks ordinary GET/HEAD while discovering the connector.
           for label,origin in hosts.items():
-              for accept in ("text/event-stream","application/json","*/*"):
-                  req=urllib.request.Request(origin+"/public-mcp",headers={"Accept":accept},method="GET")
-                  try:
-                      with urllib.request.urlopen(req,timeout=4) as rr:
-                          print("GET_CHECK",label,accept,rr.status,rr.headers.get("content-type"),flush=True)
-                  except urllib.error.HTTPError as ex:
-                      print("GET_CHECK",label,accept,ex.code,ex.read(200).decode(errors="replace"),flush=True)
-                  except Exception as ex:
-                      print("GET_CHECK",label,accept,str(ex),flush=True)
+              for path in ("/public-mcp", "/public-mcp/"):
+                  for accept in ("application/json", "*/*"):
+                      req=urllib.request.Request(origin+path,headers={"Accept":accept},method="GET")
+                      with urllib.request.urlopen(req,timeout=20) as rr:
+                          body=json.loads(rr.read())
+                          print("GET_DISCOVERY",label,path,accept,rr.status,body,flush=True)
+                          assert rr.status==200 and body.get("transport")=="streamable-http"
+              req=urllib.request.Request(origin+"/public-mcp",method="HEAD")
+              with urllib.request.urlopen(req,timeout=20) as rr:
+                  print("HEAD_DISCOVERY",label,rr.status,flush=True)
+                  assert rr.status==200
+              req=urllib.request.Request(origin+"/public-mcp",headers={"Accept":"text/event-stream"},method="GET")
+              with urllib.request.urlopen(req,timeout=20) as rr:
+                  print("GET_SSE",label,rr.status,rr.headers.get("content-type"),flush=True)
+                  assert rr.status==200 and "text/event-stream" in rr.headers.get("content-type","")
           for label,origin in hosts.items():
               url=origin+"/public-mcp"
               initial=post(url,{"jsonrpc":"2.0","id":1,"method":"initialize","params":{
