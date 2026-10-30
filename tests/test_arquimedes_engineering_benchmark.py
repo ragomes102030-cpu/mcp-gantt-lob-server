@@ -102,3 +102,26 @@ def test_xlsx_file_integrity_and_critical_marker_from_input():
     assert ws.cell(row=4, column=2).font.bold is True
     assert ws.cell(row=5, column=2).font.bold is not True
     assert ws.row_dimensions[4].outlineLevel == 1
+
+
+def test_xlsx_preserves_stable_ids_and_escapes_formula_injection():
+    original = atividade_from_dict({
+        "activity_id": "ACT-001",
+        "eap_uid": "UID-FOREVER-01",
+        "location_id": "P03",
+        "baseline_id": "BASE-2026-01",
+        "nome": "=HYPERLINK(\"https://example.invalid\",\"click\")",
+        "secao": "Teste ficticio",
+        "data_inicio": "2026-11-02",
+        "data_fim_planejada": "2026-11-03",
+        "progresso": 15,
+    })
+    wb = openpyxl.load_workbook(io.BytesIO(gerar_gantt_xlsx("Ficticio", [original])))
+    trace = wb["Rastreabilidade"]
+    assert trace["A2"].value == "ACT-001"
+    assert trace["B2"].value == "UID-FOREVER-01"
+    assert trace["C2"].value == "P03"
+    assert trace["D2"].value == "BASE-2026-01"
+    assert trace["E2"].data_type != "f"
+    assert trace["E2"].value.startswith("'=HYPERLINK")
+    assert wb.active.cell(row=4, column=2).value == original.nome
