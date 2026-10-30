@@ -39,12 +39,16 @@ async def pipeline():
                 "eap_uid":"stable-ficticio-001", "activity_id":"F01",
                 "location_id":"P01","calendar_id":None}
     async with Client(URLS["eap"], mode="auto") as eap:
+        assert {t.name for t in (await eap.list_tools()).tools} == {
+            "avaliar_evidencia_eap", "validar_estrutura_eap"}
         r = await tool(eap, "validar_estrutura_eap", {"nos":[
             {"eap_id":"1","parent_id":None,"nivel":1},
             {"eap_id":"1.1","parent_id":"1","nivel":2},
             {"eap_id":"1.2","parent_id":"1","nivel":2}]})
     assert r["ok"] is True and r["total_nos"] == 3 and r["persistido"] is False
     async with Client(URLS["cron"], mode="auto") as cron:
+        assert {t.name for t in (await cron.list_tools()).tools} == {
+            "calcular_duracao_com_evidencia", "calcular_cpm_com_evidencia"}
         c = await tool(cron, "calcular_cpm_com_evidencia", {
             "atividades":[{"id":"F01","duracao_dias":2},{"id":"A01","duracao_dias":3}],
             "dependencias":[{"predecessora_id":"F01","sucessora_id":"A01","tipo":"TI","lag_dias":0}]})
@@ -53,6 +57,9 @@ async def pipeline():
     assert by_id["F01"]["ES"] == 0 and by_id["A01"]["ES"] == 2
     assert set(c["caminho_critico"]) == {"F01","A01"}
     async with Client(URLS["lob"], mode="auto") as lob:
+        assert {t.name for t in (await lob.list_tools()).tools} == {
+            "calcular_linha_balanco", "balancear_ritmos_lob",
+            "dimensionar_equipes_lob", "listar_temas"}
         l = await tool(lob, "calcular_linha_balanco", {
             "atividades":[{"nome":"Estrutura","tempo_unitario":2},
                           {"nome":"Alvenaria","tempo_unitario":3}],
@@ -60,7 +67,7 @@ async def pipeline():
     assert l["persistido"] is False and l["duracao_total_dias"] == 8
     assert l["atividades"][0]["unidades"][0]["data_inicio"] == "2026-11-02"
     assert l["atividades"][1]["unidades"][1]["fim_dia"] == 8
-    return {"status":"PASSOU","scope_nodes":3,"cpm_days":5,"lob_days":8,
+    return {"status":"PASSOU","verified_public_tool_count":8,"scope_nodes":3,"cpm_days":5,"lob_days":8,
             "eap_uid":envelope["eap_uid"],"schema_version":"1.0",
             "warning":"Gantt XLSX privado validado em testes locais, nao via MCP publico"}
 
