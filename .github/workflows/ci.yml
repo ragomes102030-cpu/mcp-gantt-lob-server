@@ -2,13 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, feat/claude-public-readonly-20261029]
   pull_request:
     branches: [master, main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      MCP_PUBLIC_ALLOWED_ORIGINS: https://independent-client.example
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
