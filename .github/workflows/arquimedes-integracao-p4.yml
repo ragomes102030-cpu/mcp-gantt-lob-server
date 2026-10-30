@@ -1,0 +1,49 @@
+name: Arquimedes P4 — real cross-MCP UID and calendar reconciliation
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reconcile-p4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      EAP_PUBLIC_MCP_URL: https://arquimedes-mcp-eap.vercel.app/public-mcp
+      CRONOGRAMA_PUBLIC_MCP_URL: https://arquimedes-mcp-cronograma.vercel.app/public-mcp
+      GANTT_LOB_PUBLIC_MCP_URL: https://arquimedes-mcp-gantt-lob.vercel.app/public-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install official MCP client and test dependencies
+        run: |
+          python -m pip install 'mcp==2.3.0' 'pytest==8.3.4'
+          python -m pip check
+      - name: Deterministic local adapter contract
+        run: python -m pytest tests/test_arquimedes_orchestrator_p4.py -q --junitxml=p4-unit.xml
+      - name: Real live EAP to calendar CPM to LOB
+        run: |
+          set -o pipefail
+          python scripts/clients/arquimedes_orchestrator_smoke.py | tee p4-live.jsonl
+          grep -q '"status": "PASSOU"' p4-live.jsonl
+      - name: Simulate unavailable CPM; fail closed
+        run: |
+          set +e
+          python scripts/clients/arquimedes_orchestrator_smoke.py --simulate-unavailable | tee p4-blocked.jsonl
+          code=${PIPESTATUS[0]}
+          set -e
+          test "$code" -eq 2
+          grep -q '"status": "BLOQUEADO"' p4-blocked.jsonl
+          grep -q '"no_fabricated_results": true' p4-blocked.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arquimedes-p4-orchestration-verification
+          path: |
+            p4-unit.xml
+            p4-live.jsonl
+            p4-blocked.jsonl
+          if-no-files-found: warn
