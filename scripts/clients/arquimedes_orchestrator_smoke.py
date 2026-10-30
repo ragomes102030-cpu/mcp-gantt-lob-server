@@ -8,6 +8,8 @@ import asyncio
 import json
 import os
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from mcp import Client
 from mcp_gantt_lob.arquimedes_orchestrator import executar_fluxo
 
@@ -79,7 +81,9 @@ async def main():
              "calendar_id":result["calendar_id"],
              "uids":[r["eap_uid"] for r in result["mapa_tarefas"].values()],
              "divergencias":result["divergencias"],"persistido":result["persistido"]}
-    assert summary["duracao_cpm"]==8 and summary["duracao_lob"]==8 if "--json" not in sys.argv else True
+    if "--json" not in sys.argv:
+        assert summary["duracao_cpm"]==8 and summary["duracao_lob"]==8
+        assert summary["total_tarefas"]==4 and len(summary["uids"])==4
     return summary
 
 
