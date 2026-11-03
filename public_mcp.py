@@ -120,6 +120,23 @@ def comparar_cenarios_custo_prazo(
 
 
 @public_mcp.tool()
+def nivelar_frentes_de_trabalho(
+    atividades: list[dict], capacidades_recursos: dict[str, int],
+    capacidades_frentes: dict[str, int],
+    dependencias: list[dict] | None = None,
+    data_inicio: str | None = None, calendario: dict | None = None,
+) -> dict:
+    """Simula atividades por local com limite de equipes simultaneas por frente.
+
+    Input: atividades com id/duracao_dias/local_id/recursos e ocupacao_frente
+    opcional; 100% in-memory, sem consultar obras ou alterar baselines.
+    """
+    from mcp_gantt_lob.models.physical_fronts import nivelar_frentes_de_trabalho as calcular
+    return calcular(atividades, capacidades_recursos, capacidades_frentes,
+                   dependencias, data_inicio, calendario)
+
+
+@public_mcp.tool()
 def listar_temas()->list[str]:
     """Lista os temas disponiveis no Gantt, sem acessar historico de exports."""
     return ["ocean","slate","forest","amber","crimson","midnight","royal_purple","teal"]
