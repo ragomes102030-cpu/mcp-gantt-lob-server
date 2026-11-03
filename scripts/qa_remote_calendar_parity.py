@@ -13,7 +13,7 @@ CRONOGRAMA = os.getenv(
     "QA_CRONOGRAMA_MCP_URL", "https://arquimedes-mcp-cronograma.vercel.app/public-mcp"
 )
 LOB = os.getenv(
-    "QA_GANTT_LOB_MCP_URL", "https://arquimedes-mcp-gantt-lob.vercel.app/mcp"
+    "QA_GANTT_LOB_MCP_URL", "https://arquimedes-mcp-gantt-lob.vercel.app/public-mcp"
 )
 
 
