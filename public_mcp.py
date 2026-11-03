@@ -104,16 +104,19 @@ def comparar_cenarios_custo_prazo(
     dependencias: list[dict] | None = None,
     data_inicio: str | None = None, calendario: dict | None = None,
     prazo_limite_dias: float | None = None,
+    custos_mobilizacao_por_recurso: dict[str, float] | None = None,
+    custos_ociosidade_por_recurso_dia: dict[str, float] | None = None,
 ) -> dict:
     """Compara cenarios de capacidade por prazo e custo informado pelo usuario.
 
     Sem cotacao automatica, sem otimizacao global, sem acesso a baselines.
-    Custo direto cobre trabalho efetivo; nao contempla mobilizacao e ociosidade.
+    Custos de mobilizacao/ociosidade opcionais e explicitos; sem precos presumidos.
     """
     from mcp_gantt_lob.models.resource_cost_scenarios import comparar_cenarios_custo_prazo as calcular
     return calcular(atividades, cenarios, custos_por_recurso_dia,
                    custo_indireto_por_dia, dependencias, data_inicio, calendario,
-                   prazo_limite_dias)
+                   prazo_limite_dias, custos_mobilizacao_por_recurso,
+                   custos_ociosidade_por_recurso_dia)
 
 
 @public_mcp.tool()
