@@ -53,6 +53,25 @@ async def main():
         {"id": "A", "duracao_dias": 2, "recursos": {"equipe": 1}},
         {"id": "B", "duracao_dias": 2, "recursos": {"equipe": 1}},
     ]
+    # Probe endpoints with minimal protocol metadata for actionable CI errors.
+    # Avoid logging credentials; endpoints are anonymous, response text is capped.
+    import httpx
+    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as probe:
+        for name, endpoint in (("cronograma", CRONOGRAMA), ("lob", LOB)):
+            try:
+                response = await probe.post(
+                    endpoint,
+                    json={"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                          "params": {"protocolVersion": "2025-03-26",
+                                     "capabilities": {}, "clientInfo": {"name": "qa", "version": "1"}}},
+                    headers={"Accept": "application/json, text/event-stream",
+                             "Content-Type": "application/json"},
+                )
+                print(json.dumps({"probe": name, "http_status": response.status_code,
+                                  "content_type": response.headers.get("content-type"),
+                                  "response_excerpt": response.text[:350]}), flush=True)
+            except httpx.HTTPError as exc:
+                print(json.dumps({"probe": name, "transport_error": str(exc)[:180]}), flush=True)
     async with Client(CRONOGRAMA, timeout=30) as cpm_client:
         cpm_names = {getattr(t, "name", "") for t in await cpm_client.list_tools()}
         assert "calcular_cpm_com_calendario" in cpm_names, cpm_names
