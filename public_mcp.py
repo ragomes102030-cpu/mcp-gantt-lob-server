@@ -95,6 +95,27 @@ def nivelar_recursos_com_calendario(
     return calcular(atividades, capacidades, dependencias, data_inicio, calendario)
 
 
+
+@public_mcp.tool()
+def comparar_cenarios_custo_prazo(
+    atividades: list[dict], cenarios: list[dict],
+    custos_por_recurso_dia: dict[str, float],
+    custo_indireto_por_dia: float = 0,
+    dependencias: list[dict] | None = None,
+    data_inicio: str | None = None, calendario: dict | None = None,
+    prazo_limite_dias: float | None = None,
+) -> dict:
+    """Compara cenarios de capacidade por prazo e custo informado pelo usuario.
+
+    Sem cotacao automatica, sem otimizacao global, sem acesso a baselines.
+    Custo direto cobre trabalho efetivo; nao contempla mobilizacao e ociosidade.
+    """
+    from mcp_gantt_lob.models.resource_cost_scenarios import comparar_cenarios_custo_prazo as calcular
+    return calcular(atividades, cenarios, custos_por_recurso_dia,
+                   custo_indireto_por_dia, dependencias, data_inicio, calendario,
+                   prazo_limite_dias)
+
+
 @public_mcp.tool()
 def listar_temas()->list[str]:
     """Lista os temas disponiveis no Gantt, sem acessar historico de exports."""
