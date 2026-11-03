@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "scripts/qa_remote_calendar_parity.py"
+      - "scripts/qa_remote_three_mcp_chain.py"
       - ".github/workflows/remote-mcp-calendar-parity.yml"
 
 permissions:
@@ -24,3 +25,5 @@ jobs:
         run: python -m pip install fastmcp==4.0.3 httpx==0.28.1
       - name: Verify public tools and CPM/LOB calendar consistency
         run: python scripts/qa_remote_calendar_parity.py
+      - name: Verify remote EAP to CPM LOB cost workflow
+        run: python scripts/qa_remote_three_mcp_chain.py
