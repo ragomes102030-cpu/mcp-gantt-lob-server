@@ -79,6 +79,22 @@ def calcular_lob_com_vinculos(
     return calcular(atividades, locais, dependencias, data_inicio, calendario, restricoes_inicio)
 
 
+
+@public_mcp.tool()
+def nivelar_recursos_com_calendario(
+    atividades: list[dict], capacidades: dict[str, int],
+    dependencias: list[dict] | None = None,
+    data_inicio: str | None = None, calendario: dict | None = None,
+) -> dict:
+    """Simula recursos renovaveis com capacidades, vinculos TI e calendario comum.
+
+    Entrada por payload, sem acesso ou alteracao de obras e baselines.
+    Nao garante otimo de prazo/custo; no modo uteis exige dias inteiros.
+    """
+    from mcp_gantt_lob.models.resource_calendar import nivelar_recursos_com_calendario as calcular
+    return calcular(atividades, capacidades, dependencias, data_inicio, calendario)
+
+
 @public_mcp.tool()
 def listar_temas()->list[str]:
     """Lista os temas disponiveis no Gantt, sem acessar historico de exports."""
