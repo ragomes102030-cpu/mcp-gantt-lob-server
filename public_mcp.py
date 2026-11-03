@@ -137,6 +137,26 @@ def nivelar_frentes_de_trabalho(
 
 
 @public_mcp.tool()
+def nivelar_calendarios_por_equipe(
+    atividades: list[dict],
+    capacidades_recursos: dict[str, int],
+    calendarios_recursos: dict[str, dict],
+    data_inicio: str,
+    dependencias: list[dict] | None = None,
+    capacidades_frentes: dict[str, int] | None = None,
+) -> dict:
+    """Programa atividades em dias produtivos comuns a cada equipe alocada.
+
+    Aceita calendarios explicitos por recurso (dias_semana e feriados), limites
+    de capacidade e opcionalmente slots fisicos por local_id. Sem banco ou
+    alteracao de baselines; dias produtivos inteiros, sem horas/turnos.
+    """
+    from mcp_gantt_lob.models.team_calendars import nivelar_calendarios_por_equipe as calcular
+    return calcular(atividades, capacidades_recursos, calendarios_recursos,
+                   data_inicio, dependencias, capacidades_frentes)
+
+
+@public_mcp.tool()
 def listar_temas()->list[str]:
     """Lista os temas disponiveis no Gantt, sem acessar historico de exports."""
     return ["ocean","slate","forest","amber","crimson","midnight","royal_purple","teal"]
