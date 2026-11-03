@@ -152,6 +152,8 @@ def nivelar_calendarios_por_equipe(
         for predecessor, lag in incoming[tid]:
             min_date = max(min_date, scheduled[predecessor]["_finish"] + timedelta(days=lag))
         resource_ids = list(task["recursos"])
+        if not set.intersection(*(calendars[r][0] for r in resource_ids)):
+            raise ValueError(f"Sem capacidade ou dias comuns para atividade {tid}")
         def active(day):
             return all(day.weekday() in calendars[r][0] and
                        day not in calendars[r][1] for r in resource_ids)
