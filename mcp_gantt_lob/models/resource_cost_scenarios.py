@@ -24,12 +24,14 @@ def comparar_cenarios_custo_prazo(
     data_inicio: str | None = None,
     calendario: dict | None = None,
     prazo_limite_dias: float | None = None,
+    custos_mobilizacao_por_recurso: dict[str, float] | None = None,
+    custos_ociosidade_por_recurso_dia: dict[str, float] | None = None,
 ) -> dict:
     """Direct cost = sum(activity duration * resource demand * resource daily rate).
 
-    Indirect cost = schedule duration * overhead daily rate. Capacity alone
-    does not incur cost; idle team reservation, mobilization and overtime
-    are not modeled. Durations and quantities are externally supplied.
+    Indirect cost = schedule duration * overhead daily rate. Optional mobilization
+    applies once per reserved unit. Optional idle cost charges available
+    capacity-days not consumed, reserved over the whole project timeline.
     """
     if not isinstance(cenarios, list) or not 1 <= len(cenarios) <= 20:
         raise ValueError("Informe de 1 a 20 cenarios")
@@ -42,6 +44,20 @@ def comparar_cenarios_custo_prazo(
         rates[rid] = _valor(value, f"custo de {rid}")
     indirect = _valor(custo_indireto_por_dia, "custo_indireto_por_dia")
     deadline = None if prazo_limite_dias is None else _valor(prazo_limite_dias, "prazo_limite_dias")
+    def optional_rates(values, label):
+        if values is None:
+            return {}
+        if not isinstance(values, dict):
+            raise ValueError(f"{label} deve ser dicionario")
+        out = {}
+        for rid, amount in values.items():
+            if rid not in rates:
+                raise ValueError(f"{label}: recurso desconhecido {rid}")
+            out[rid] = _valor(amount, f"{label} {rid}")
+        return out
+
+    mobilization_rates = optional_rates(custos_mobilizacao_por_recurso, "mobilizacao")
+    idle_rates = optional_rates(custos_ociosidade_por_recurso_dia, "ociosidade")
     evaluated = []
     used_names = set()
     for scenario in cenarios:
@@ -56,21 +72,34 @@ def comparar_cenarios_custo_prazo(
             atividades, capacities, dependencias, data_inicio, calendario
         )
         direct = 0.0
+        busy_days = {rid: 0.0 for rid in capacities}
         for row in schedule["tarefas"]:
             duration = row["fim_dia"] - row["inicio_dia"]
             for rid, units in row["recursos"].items():
                 if rid not in rates:
                     raise ValueError(f"Falta custo por recurso/dia: {rid}")
                 direct += duration * units * rates[rid]
+                busy_days[rid] += duration * units
         duration = schedule["duracao_total_dias"]
         overhead = duration * indirect
-        total = direct + overhead
+        mobilization = sum(cap * mobilization_rates.get(rid, 0)
+                           for rid, cap in capacities.items())
+        idle_units_days = {
+            rid: max(0.0, cap * duration - busy_days[rid])
+            for rid, cap in capacities.items()
+        }
+        idle_cost = sum(idle_units_days[rid] * idle_rates.get(rid, 0)
+                        for rid in capacities)
+        total = direct + overhead + mobilization + idle_cost
         if not math.isfinite(total) or total > 1e15:
             raise ValueError("Custo total excede limite")
         evaluated.append({
             "nome": name, "duracao_total_dias": duration,
             "custo_direto": round(direct, 2),
             "custo_indireto": round(overhead, 2),
+            "custo_mobilizacao": round(mobilization, 2),
+            "custo_ociosidade": round(idle_cost, 2),
+            "ociosidade_unidades_dia": {rid: round(v, 6) for rid, v in idle_units_days.items()},
             "custo_total": round(total, 2),
             "dentro_prazo": deadline is None or duration <= deadline,
             "capacidades": capacities,
@@ -89,6 +118,9 @@ def comparar_cenarios_custo_prazo(
             "custo direto somente das horas/dias trabalhados, sem ociosidade",
             "capacidade de recurso nao reduz duracao automaticamente",
             "custo indireto proporcional a duracao em dias logicos",
-            "nao inclui mobilizacao, horas extras, reajustes ou riscos",
+            "mobilizacao opcional por unidade de capacidade reservada",
+            "ociosidade opcional: capacidade vezes prazo menos consumo; reserva integral",
+            "taxa de ociosidade incremental ao custo direto para evitar dupla contagem",
+            "nao inclui horas extras, reajustes, riscos nem janela de mobilizacao",
         ],
     }
