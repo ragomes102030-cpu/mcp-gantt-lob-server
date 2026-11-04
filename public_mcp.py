@@ -157,6 +157,34 @@ def nivelar_calendarios_por_equipe(
 
 
 @public_mcp.tool()
+def comparar_cenarios_equipes_frentes(
+    atividades: list[dict],
+    cenarios: list[dict],
+    calendarios_recursos: dict[str, dict],
+    custos_por_recurso_dia: dict[str, float],
+    data_inicio: str,
+    custo_indireto_por_dia_corrido: float = 0,
+    dependencias: list[dict] | None = None,
+    prazo_limite_dias_corridos: int | None = None,
+    custos_mobilizacao_por_recurso: dict[str, float] | None = None,
+    custos_ociosidade_por_recurso_dia: dict[str, float] | None = None,
+) -> dict:
+    """Compara cenarios informados com calendarios por equipe e frentes fisicas.
+
+    Cada cenario informa nome, capacidades_recursos e capacidades_frentes
+    opcionais. Ociosidade usa dias disponiveis do proprio calendario,
+    indireto usa dias civis. Sem consulta a obras, precos ou baselines.
+    """
+    from mcp_gantt_lob.models.team_front_cost_scenarios import comparar_cenarios_equipes_frentes as calcular
+    return calcular(atividades, cenarios, calendarios_recursos,
+                   custos_por_recurso_dia, data_inicio,
+                   custo_indireto_por_dia_corrido, dependencias,
+                   prazo_limite_dias_corridos,
+                   custos_mobilizacao_por_recurso,
+                   custos_ociosidade_por_recurso_dia)
+
+
+@public_mcp.tool()
 def listar_temas()->list[str]:
     """Lista os temas disponiveis no Gantt, sem acessar historico de exports."""
     return ["ocean","slate","forest","amber","crimson","midnight","royal_purple","teal"]
