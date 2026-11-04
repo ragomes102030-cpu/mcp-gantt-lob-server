@@ -8,6 +8,7 @@ on:
       - "scripts/qa_remote_calendar_parity.py"
       - "scripts/qa_remote_three_mcp_chain.py"
       - "scripts/qa_remote_front_team_calendars.py"
+      - "scripts/qa_remote_building_30_activities.py"
       - ".github/workflows/remote-mcp-calendar-parity.yml"
 
 permissions:
@@ -30,3 +31,5 @@ jobs:
         run: python scripts/qa_remote_three_mcp_chain.py
       - name: Verify remote physical fronts team calendars and cost extensions
         run: python scripts/qa_remote_front_team_calendars.py
+      - name: Validate Edificio QA-001 30 activities EAP CPM LOB parity
+        run: python scripts/qa_remote_building_30_activities.py
