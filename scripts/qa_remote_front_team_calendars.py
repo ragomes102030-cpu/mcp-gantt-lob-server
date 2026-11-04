@@ -14,7 +14,7 @@ async def main():
         names = {tool.name for tool in await client.list_tools()}
         expected = {"nivelar_frentes_de_trabalho",
                     "nivelar_calendarios_por_equipe",
-                    "comparar_cenarios_custo_prazo"}
+                    "comparar_cenarios_custo_prazo", "comparar_cenarios_equipes_frentes"}
         assert expected <= names, f"Missing public tools: {expected - names}"
 
         independent = [
@@ -85,6 +85,43 @@ async def main():
         assert by_scenario["uma-equipe"]["custo_mobilizacao"] == 100
         assert by_scenario["duas-equipes"]["custo_mobilizacao"] == 200
 
+        # New public comparator includes individual holidays, physical constraints
+        # and actual available days in idle-charge calculations.
+        integrated = parse(await client.call_tool(
+            "comparar_cenarios_equipes_frentes",
+            {
+                "atividades": independent,
+                "cenarios": [
+                    {"nome": "uma-frente",
+                     "capacidades_recursos": {"alvenaria": 1, "eletrica": 1},
+                     "capacidades_frentes": {"P01": 1}},
+                    {"nome": "duas-frentes",
+                     "capacidades_recursos": {"alvenaria": 1, "eletrica": 1},
+                     "capacidades_frentes": {"P01": 2}},
+                ],
+                "calendarios_recursos": {
+                    "alvenaria": {"dias_semana": [0, 1, 2, 3, 4],
+                                  "feriados": ["2026-11-09"]},
+                    "eletrica": {"dias_semana": [0, 1, 2, 3, 4]},
+                },
+                "custos_por_recurso_dia": {"alvenaria": 100, "eletrica": 100},
+                "data_inicio": "2026-11-06",
+                "custo_indireto_por_dia_corrido": 50,
+                "custos_mobilizacao_por_recurso": {
+                    "alvenaria": 100, "eletrica": 100},
+                "custos_ociosidade_por_recurso_dia": {
+                    "alvenaria": 10, "eletrica": 10},
+                "prazo_limite_dias_corridos": 5,
+            }
+        ))
+        assert integrated["persistido"] is False
+        integrated_by_name = {x["nome"]: x for x in integrated["cenarios"]}
+        assert integrated_by_name["uma-frente"]["custo_total"] == 1000
+        assert integrated_by_name["duas-frentes"]["custo_total"] == 860
+        assert integrated_by_name["uma-frente"]["duracao_total_dias_corridos"] == 7
+        assert integrated_by_name["duas-frentes"]["duracao_total_dias_corridos"] == 5
+        assert integrated["melhor_cenario_testado"] == "duas-frentes"
+
     print(json.dumps({
         "valid": True, "public_tools": sorted(expected),
         "same_front_days": 4, "separate_floors_days": 2,
@@ -93,6 +130,8 @@ async def main():
         "exclusive_finish": calendars["data_fim_projeto_exclusiva"],
         "cost_one_team": by_scenario["uma-equipe"]["custo_total"],
         "cost_two_teams": by_scenario["duas-equipes"]["custo_total"],
+        "integrated_cost_one_front": integrated_by_name["uma-frente"]["custo_total"],
+        "integrated_cost_two_fronts": integrated_by_name["duas-frentes"]["custo_total"],
         "persistence": False,
     }))
 
