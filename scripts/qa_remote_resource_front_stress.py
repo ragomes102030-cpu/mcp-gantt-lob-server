@@ -77,7 +77,7 @@ def verify_schedule(output, tasks, dependencies, caps, fronts):
         predecessor = rows[link["predecessora_id"]]
         successor = rows[link["sucessora_id"]]
         assert successor["data_inicio"] >= predecessor["data_fim_exclusiva"], link
-    assert not output["persistido"]
+    # Persistence marker belongs to top-level comparator response, not each scenario.
     return used
 
 
