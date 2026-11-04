@@ -11,6 +11,7 @@ on:
       - "scripts/qa_remote_building_30_activities.py"
       - "scripts/qa_remote_resource_front_stress.py"
       - "scripts/qa_remote_resource_front_stress_100.py"
+      - "scripts/qa_remote_resource_front_stress_200.py"
       - ".github/workflows/remote-mcp-calendar-parity.yml"
 
 permissions:
@@ -39,3 +40,5 @@ jobs:
         run: python scripts/qa_remote_resource_front_stress.py
       - name: Audit 100 activities on 25 floors with shared resources
         run: python scripts/qa_remote_resource_front_stress_100.py
+      - name: Audit 200 activity declared limit with resource and front conflicts
+        run: python scripts/qa_remote_resource_front_stress_200.py
