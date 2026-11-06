@@ -110,8 +110,8 @@ def calcular_lob_com_vinculos(
                 "numero_equipes": teams, "duracao_dias": d,
             }
             team_chains.setdefault(team, []).append(key)
-    if len(tasks) > 2000:
-        raise ValueError("Mais de 2000 tarefas atividade-local")
+    if len(tasks) > 5000:
+        raise ValueError("Mais de 5000 tarefas atividade-local")
     if modo == "uteis" and any(abs(t["duracao_dias"] - round(t["duracao_dias"])) > 1e-9 for t in tasks.values()):
         raise ValueError("calendario uteis exige duracoes inteiras apos equipes")
 
@@ -128,8 +128,8 @@ def calcular_lob_com_vinculos(
         incoming_count[succ] += 1
 
     for dep in dependencias:
-        if not isinstance(dep, dict) or dep.get("tipo", "TI") != "TI":
-            raise ValueError("LOB com vinculos aceita exclusivamente tipo TI; II/TT/IT permanecem no CPM")
+        if not isinstance(dep, dict) or str(dep.get("tipo", "TI")).strip().upper() not in ("TI", "FS"):
+            raise ValueError("LOB com vinculos aceita apenas TI/FS; II/SS, TT/FF e IT/SF permanecem no CPM")
         pred = (_id(dep.get("predecessora_id"), "predecessora_id"),
                 _id(dep.get("predecessora_local"), "predecessora_local"))
         succ = (_id(dep.get("sucessora_id"), "sucessora_id"),
