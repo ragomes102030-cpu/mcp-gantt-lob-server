@@ -42,8 +42,8 @@ def _validar_atividades(atividades:list[dict])->list[AtividadeLOB]:
 def calcular_linha_balanco(atividades:list[dict],unidades:list[str],data_inicio:str|None=None)->dict:
     """Calcula LOB repetitiva e escadinha a partir de atividades e unidades fornecidas."""
     objs=_validar_atividades(atividades)
-    if not isinstance(unidades,list) or not 1<=len(unidades)<=100 or len(objs)*len(unidades)>2000:
-        raise ValueError("Informe 1-100 unidades e no maximo 2000 combinacoes.")
+    if not isinstance(unidades,list) or not 1<=len(unidades)<=100 or len(objs)*len(unidades)>5000:
+        raise ValueError("Informe 1-100 unidades e no maximo 5000 combinacoes.")
     if any(not isinstance(x,str) or not x.strip() or len(x.strip())>100 for x in unidades):
         raise ValueError("Unidade invalida.")
     unidades_limpas = [x.strip() for x in unidades]
@@ -70,7 +70,7 @@ def calcular_lob_com_vinculos(
     data_inicio: str | None = None, calendario: dict | None = None,
     restricoes_inicio: list[dict] | None = None,
 ) -> dict:
-    """LOB de atividades x locais com vinculos TI explicitos, equipes e calendario opcional.
+    """LOB de atividades x locais com vinculos TI/FS explicitos, equipes e calendario opcional.
 
     Entrada stateless: activity_id, eap_uid (opcional), duration e location_id;
     sem acesso a bancos, obra real ou outros servidores MCP.
