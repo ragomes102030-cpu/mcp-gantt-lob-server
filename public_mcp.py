@@ -53,6 +53,21 @@ def calcular_linha_balanco(atividades:list[dict],unidades:list[str],data_inicio:
     return {**_lob(objs,unidades_limpas,data_inicio=inicio),"persistido":False}
 
 @public_mcp.tool()
+def auditar_parcelas_lob_cpm(
+    atividades: list[dict], locais: list[dict], parcelas: list[dict]
+) -> dict:
+    """Audita parcelas com janelas CPM ja convertidas no calendario da obra.
+
+    Sem banco e sem corrigir datas automaticamente. Detecta local didatico,
+    parcela orfa, inicio precoce, termino tardio e alerta cadencia suspeita.
+    """
+    from mcp_gantt_lob.models.auditoria_parcelas import (
+        auditar_parcelas_lob_cpm as auditar,
+    )
+    return auditar(atividades, locais, parcelas)
+
+
+@public_mcp.tool()
 def balancear_ritmos_lob(atividades:list[dict])->dict:
     """Compara ritmos sucessivos sem alterar equipes de qualquer obra."""
     return {**_balancear(_validar_atividades(atividades)),"persistido":False}
