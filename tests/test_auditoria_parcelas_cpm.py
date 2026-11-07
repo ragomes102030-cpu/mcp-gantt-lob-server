@@ -33,3 +33,23 @@ def test_detecta_referencia_orfa_e_fim_posterior():
          {"activity_id": 404, "location_id": 2, "start_date": "2026-11-03", "finish_date": "2026-11-04"}],
     )
     assert {"DEPOIS_DO_CPM", "ATIVIDADE_ORFA"} <= {a["codigo"] for a in r["achados"]}
+
+
+def test_regressao_escola_30_atividades_90_parcelas():
+    # Fixture de contagem baseada na auditoria real: 3 atividades com ES=0,
+    # 27 atividades posteriores, cada uma alocada nos 3 locais didaticos.
+    # Datas oficiais neste teste sao artificiais: NAO substituem o calendario da obra.
+    acts = [{"id": i, "inicio_cpm": "2026-10-29" if i < 3 else "2026-11-03",
+             "fim_cpm": "2026-12-31"} for i in range(30)]
+    units = [{"id": u, "nome": f"Setor {u} (didatico)", "didatico": True}
+             for u in (52, 53, 54)]
+    parcels = [{"activity_id": i, "location_id": u,
+                "start_date": "2026-10-29", "finish_date": "2026-11-02"}
+               for i in range(30) for u in (52, 53, 54)]
+    r = auditar_parcelas_lob_cpm(acts, units, parcels)
+    assert r["total_parcelas"] == 90
+    assert sum(x["codigo"] == "ANTES_DO_CPM" for x in r["achados"]) == 81
+    assert sum(x["codigo"] == "LOCAL_DIDATICO" for x in r["achados"]) == 90
+    assert len(r["alertas"]) == 30
+    assert r["valido"] is False
+    assert r["persistido"] is False
