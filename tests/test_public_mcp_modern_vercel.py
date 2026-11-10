@@ -153,6 +153,7 @@ def test_modern_http_response_is_complete_for_a_real_http_client():
             assert response.status == 200
             assert response.headers.get("Transfer-Encoding") == "chunked"
         assert "2026-07-28" in result["result"]["supportedVersions"]
+        assert result["result"]["capabilities"] == {"tools": {}}
     finally:
         server.shutdown()
         thread.join(timeout=5)

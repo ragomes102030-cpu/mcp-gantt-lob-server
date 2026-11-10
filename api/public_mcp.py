@@ -73,9 +73,7 @@ def _dispatch_modern_jsonrpc(request):
     if method == "server/discover":
         return {"jsonrpc": "2.0", "id": request_id, "result": {
             "cacheScope": "private",
-            "capabilities": {"prompts": {"listChanged": True},
-                             "resources": {"listChanged": True, "subscribe": True},
-                             "tools": {"listChanged": True}},
+            "capabilities": {"tools": {}},
             "instructions": ("Modo publico de calculo LOB. Analisa somente os dados "
                              "enviados na chamada, sem consultar ou alterar obras e baselines."),
             "resultType": "complete", "supportedVersions": ["2026-07-28"],
