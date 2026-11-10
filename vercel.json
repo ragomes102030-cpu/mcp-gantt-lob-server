@@ -1,3 +1,10 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/public-mcp",
+      "destination": "/api/public_mcp"
+    }
+  ],
+  "framework": null
 }
