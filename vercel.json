@@ -4,6 +4,18 @@
     {
       "source": "/public-mcp",
       "destination": "/api/public_mcp"
+    },
+    {
+      "source": "/mcp",
+      "destination": "/api/index?__vercel_original_path=/mcp"
+    },
+    {
+      "source": "/healthz",
+      "destination": "/api/index?__vercel_original_path=/healthz"
+    },
+    {
+      "source": "/api/healthz",
+      "destination": "/api/index?__vercel_original_path=/api/healthz"
     }
   ],
   "framework": null
